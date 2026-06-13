@@ -30,14 +30,7 @@
         
         .others-guesses { margin-top: 15px; padding: 10px; background: #e9ecef; border-radius: 6px; font-size: 13px; }
         .others-guesses ul { margin: 5px 0 0 0; padding-left: 20px; }
-        
-        /* Mobile Optimization */
-        @media (max-width: 600px) {
-            .match-header { flex-direction: column; align-items: flex-start; }
-            .match-inputs { margin-top: 15px; width: 100%; justify-content: space-between; }
-            .match-inputs button { flex-grow: 1; margin-left: 10px; }
-            .score-box { font-size: 20px; padding: 5px 10px; margin-top: 10px; align-self: flex-start; }
-        }
+    </style>
 </head>
 <body>
 
@@ -54,22 +47,11 @@
     <!-- Upcoming Matches Section -->
     <div class="card" id="predictions-section" style="display: none;">
         <h2 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
-            Matches (Next 24 Hours)
+            Matches
             <button onclick="window.location.reload()" style="font-size: 12px; padding: 8px 15px;">Refresh</button>
         </h2>
-        <p style="font-size: 13px; color: #666;">Predictions lock exactly 1 hour before kickoff.</p>
+        <p style="font-size: 13px; color: #666;">Predictions lock exactly 1 hour before kickoff. Once locked, everyone's guesses are revealed!</p>
         <div id="matches-container">Loading games...</div>
-    </div>
-
-    <!-- History Section -->
-    <div class="card" id="history-section" style="display: none;">
-        <details>
-            <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; outline: none; margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
-                <span>📜 Match History</span>
-                <span style="font-size: 0.5em; font-weight: normal; color: #666;">(Click to expand)</span>
-            </summary>
-            <div id="history-container" style="margin-top: 15px;">Loading history...</div>
-        </details>
     </div>
 
     <!-- Leaderboard Section -->
@@ -122,7 +104,6 @@
                 document.getElementById("login-btn").style.display = "none";
                 document.getElementById("logout-btn").style.display = "inline-block";
                 document.getElementById("predictions-section").style.display = "block";
-                document.getElementById("history-section").style.display = "block";
                 
                 loadPlayerDashboard();
             } else {
@@ -131,7 +112,6 @@
                 document.getElementById("login-btn").style.display = "inline-block";
                 document.getElementById("logout-btn").style.display = "none";
                 document.getElementById("predictions-section").style.display = "none";
-                document.getElementById("history-section").style.display = "none";
                 document.getElementById("matches-container").innerHTML = "";
             }
         });
@@ -139,7 +119,6 @@
         // --- PLAYER FUNCTIONS (Reads entirely from Firebase) ---
         async function loadPlayerDashboard() {
             const container = document.getElementById("matches-container");
-            const historyContainer = document.getElementById("history-container");
             const lbBody = document.getElementById("leaderboard-body");
             
             try {
@@ -158,31 +137,20 @@
                 let users = [];
                 usersSnap.forEach(doc => users.push(doc.data()));
 
-                // Time definitions
-                const now = new Date().getTime();
-                const next24 = now + (24 * 60 * 60 * 1000);
-
-                // Split Matches into Upcoming and History
-                const historyMatches = matches.filter(m => m.status === 'FINISHED' || m.status === 'AWARDED');
-                const upcomingMatches = matches.filter(m => 
-                    m.status !== 'FINISHED' && m.status !== 'AWARDED' && 
-                    new Date(m.utcDate).getTime() <= next24
-                );
-
-                // ==========================================
-                // RENDER UPCOMING MATCHES (Next 24 Hours)
-                // ==========================================
+                // Render Matches
                 container.innerHTML = "";
-                if(upcomingMatches.length === 0) {
-                    container.innerHTML = "<p>No matches scheduled in the next 24 hours.</p>";
+                if(matches.length === 0) {
+                    container.innerHTML = "<p>No matches loaded yet. Waiting for admin to sync.</p>";
                 } else {
-                    upcomingMatches.sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
+                    // Sort matches by date
+                    matches.sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
                     
-                    upcomingMatches.forEach(match => {
+                    matches.forEach(match => {
                         const matchDate = new Date(match.utcDate);
-                        const msUntilKickoff = matchDate.getTime() - now;
-                        const isLocked = msUntilKickoff <= 3600000; // 1 hour
+                        const msUntilKickoff = matchDate.getTime() - new Date().getTime();
+                        const isLocked = msUntilKickoff <= 3600000; // 1 hour = 3600000 ms
                         
+                        // Find user's own prediction
                         const myPred = allPreds.find(p => p.match_id === match.id && p.user_id === currentUser.uid);
                         const homeVal = myPred ? myPred.home_pred : "";
                         const awayVal = myPred ? myPred.away_pred : "";
@@ -207,71 +175,23 @@
                                 </div>
                         `;
 
-                        // Always reveal everyone else's guesses!
-                        const matchPreds = allPreds.filter(p => p.match_id === match.id);
-                        html += `<div class="others-guesses"><strong>Everyone's Guesses:</strong><ul>`;
-                        if(matchPreds.length === 0) {
-                            html += `<li><span style="color:#888;">No predictions yet.</span></li>`;
-                        } else {
-                            matchPreds.forEach(p => {
-                                const isMe = p.user_id === currentUser.uid;
-                                const nameDisplay = isMe ? `<b>${p.user_name} (You)</b>` : p.user_name;
-                                const pointString = p.points_awarded !== undefined ? ` <b style="color:green;">(+${p.points_awarded} pts)</b>` : "";
-                                html += `<li>${nameDisplay}: <b>${p.home_pred} - ${p.away_pred}</b>${pointString}</li>`;
-                            });
+                        // If locked, reveal everyone else's guesses!
+                        if (isLocked) {
+                            const matchPreds = allPreds.filter(p => p.match_id === match.id);
+                            html += `<div class="others-guesses"><strong>Everyone's Guesses:</strong><ul>`;
+                            if(matchPreds.length === 0) {
+                                html += `<li>No one guessed on this game.</li>`;
+                            } else {
+                                matchPreds.forEach(p => {
+                                    const pointString = p.points_awarded !== undefined ? ` <b style="color:green;">(+${p.points_awarded} pts)</b>` : "";
+                                    html += `<li>${p.user_name}: <b>${p.home_pred} - ${p.away_pred}</b>${pointString}</li>`;
+                                });
+                            }
+                            html += `</ul></div>`;
                         }
-                        html += `</ul></div></div>`;
+
+                        html += `</div>`;
                         container.innerHTML += html;
-                    });
-                }
-
-                // ==========================================
-                // RENDER HISTORY MATCHES (Finished)
-                // ==========================================
-                historyContainer.innerHTML = "";
-                if(historyMatches.length === 0) {
-                    historyContainer.innerHTML = "<p>No finished matches yet.</p>";
-                } else {
-                    // Sort newest finished first
-                    historyMatches.sort((a,b) => new Date(b.utcDate) - new Date(a.utcDate));
-                    
-                    historyMatches.forEach(match => {
-                        const matchDate = new Date(match.utcDate);
-                        const realHome = match.score && match.score.home !== null ? match.score.home : '-';
-                        const realAway = match.score && match.score.away !== null ? match.score.away : '-';
-                        
-                        let html = `
-                            <div class="match" style="background: #e9ecef; border-color: #ced4da;">
-                                <div class="match-header">
-                                    <div class="match-info">
-                                        <span class="status-badge" style="background: #6c757d; color: white;">FINISHED</span><br>
-                                        <strong>${match.homeTeam}</strong> vs <strong>${match.awayTeam}</strong><br>
-                                        <small style="color: #666;">${matchDate.toLocaleString()}</small>
-                                    </div>
-                                    <div class="score-box" style="font-size: 24px; font-weight: bold; padding: 0 20px; background: white; border-radius: 8px; border: 1px solid #ccc; min-width: 60px; text-align: center;">
-                                        ${realHome} - ${realAway}
-                                    </div>
-                                </div>
-                        `;
-
-                        const matchPreds = allPreds.filter(p => p.match_id === match.id);
-                        html += `<div class="others-guesses" style="background: white; border: 1px solid #ced4da;"><strong>Players' Guesses & Points:</strong><ul>`;
-                        if(matchPreds.length === 0) {
-                            html += `<li><span style="color:#888;">No predictions were made.</span></li>`;
-                        } else {
-                            // Sort by highest points earned on this match
-                            matchPreds.sort((a,b) => (b.points_awarded || 0) - (a.points_awarded || 0));
-                            
-                            matchPreds.forEach(p => {
-                                const isMe = p.user_id === currentUser.uid;
-                                const nameDisplay = isMe ? `<b>${p.user_name} (You)</b>` : p.user_name;
-                                const pts = p.points_awarded || 0;
-                                const pointString = pts > 0 ? ` <b style="color:green;">(+${pts} pts)</b>` : ` <span style="color:#888;">(+0 pts)</span>`;
-                                html += `<li>${nameDisplay}: <b>${p.home_pred} - ${p.away_pred}</b>${pointString}</li>`;
-                            });
-                        }
-                        html += `</ul></div></div>`;
-                        historyContainer.innerHTML += html;
                     });
                 }
 
