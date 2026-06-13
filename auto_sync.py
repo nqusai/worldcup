@@ -1,0 +1,98 @@
+import os
+import json
+import requests
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+# --- CONFIGURATION ---
+COMPETITION_CODE = "WC" # World Cup code
+
+# 1. Initialize Firebase Securely
+cert_json = os.environ.get('FIREBASE_CREDENTIALS')
+if not cert_json:
+    raise ValueError("Missing FIREBASE_CREDENTIALS environment variable")
+
+cred_dict = json.loads(cert_json)
+cred = credentials.Certificate(cred_dict)
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+
+# 2. API Setup
+API_KEY = os.environ.get('FOOTBALL_API_KEY')
+if not API_KEY:
+    raise ValueError("Missing FOOTBALL_API_KEY environment variable")
+    
+headers = { "X-Auth-Token": API_KEY }
+base_url = f"https://api.football-data.org/v4/competitions/{COMPETITION_CODE}/matches"
+
+print("🤖 Starting Automatic Sync...")
+
+# ==========================================
+# STEP 1: SYNC UPCOMING GAMES
+# ==========================================
+print("Fetching upcoming games...")
+resp = requests.get(base_url, headers=headers).json()
+
+if 'matches' in resp:
+    count = 0
+    for match in resp['matches']:
+        if match['status'] not in ["FINISHED", "AWARDED"]:
+            db.collection("matches").document(str(match['id'])).set({
+                "homeTeam": match['homeTeam'].get('name', 'TBD'),
+                "awayTeam": match['awayTeam'].get('name', 'TBD'),
+                "utcDate": match['utcDate'],
+                "status": match['status']
+            })
+            count += 1
+    print(f"✅ Saved {count} active/upcoming matches to Firebase.")
+else:
+    print("⚠️ No matches found in API response.")
+
+# ==========================================
+# STEP 2: CALCULATE POINTS FOR FINISHED GAMES
+# ==========================================
+print("Calculating points for finished games...")
+finished_resp = requests.get(f"{base_url}?status=FINISHED", headers=headers).json()
+finished_matches = finished_resp.get('matches', [])
+
+preds_ref = db.collection('predictions').stream()
+user_points = {}
+
+for doc in preds_ref:
+    pred = doc.to_dict()
+    uid = pred['user_id']
+    
+    if uid not in user_points:
+        user_points[uid] = {"name": pred.get('user_name', 'Unknown Player'), "total": 0}
+        
+    # Find if this specific prediction's match has finished
+    actual_match = next((m for m in finished_matches if str(m['id']) == str(pred['match_id'])), None)
+    
+    if actual_match and 'score' in actual_match and actual_match['score']['fullTime']['home'] is not None:
+        r_home = actual_match['score']['fullTime']['home']
+        r_away = actual_match['score']['fullTime']['away']
+        p_home = pred['home_pred']
+        p_away = pred['away_pred']
+        
+        pts = 0
+        if p_home == r_home and p_away == r_away:
+            pts = 3 # Exact
+        elif (p_home - p_away) == (r_home - r_away):
+            pts = 2 # Margin / Draw
+        elif (p_home > p_away and r_home > r_away) or (p_home < p_away and r_home < r_away):
+            pts = 1 # Outcome
+            
+        user_points[uid]['total'] += pts
+        
+        # Save awarded points to the prediction document
+        db.collection('predictions').document(doc.id).update({"points_awarded": pts})
+
+# Update Users Leaderboard Collection
+for uid, data in user_points.items():
+    db.collection('users').document(uid).set({
+        "name": data['name'], 
+        "points": data['total']
+    }, merge=True)
+
+print("✅ Leaderboard updated successfully!")
+print("🏁 Sync complete.")
