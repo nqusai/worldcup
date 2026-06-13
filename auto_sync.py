@@ -28,23 +28,28 @@ base_url = f"https://api.football-data.org/v4/competitions/{COMPETITION_CODE}/ma
 print("🤖 Starting Automatic Sync...")
 
 # ==========================================
-# STEP 1: SYNC UPCOMING GAMES
+# STEP 1: SYNC ALL GAMES (Upcoming & Live)
 # ==========================================
-print("Fetching upcoming games...")
+print("Fetching all games...")
 resp = requests.get(base_url, headers=headers).json()
 
 if 'matches' in resp:
     count = 0
     for match in resp['matches']:
-        if match['status'] not in ["FINISHED", "AWARDED"]:
-            db.collection("matches").document(str(match['id'])).set({
-                "homeTeam": match['homeTeam'].get('name', 'TBD'),
-                "awayTeam": match['awayTeam'].get('name', 'TBD'),
-                "utcDate": match['utcDate'],
-                "status": match['status']
-            })
-            count += 1
-    print(f"✅ Saved {count} active/upcoming matches to Firebase.")
+        match_data = {
+            "homeTeam": match['homeTeam'].get('name', 'TBD'),
+            "awayTeam": match['awayTeam'].get('name', 'TBD'),
+            "utcDate": match['utcDate'],
+            "status": match['status']
+        }
+        
+        # Save actual scores if they exist
+        if 'score' in match and match['score'].get('fullTime') and match['score']['fullTime']['home'] is not None:
+            match_data['score'] = match['score']['fullTime']
+            
+        db.collection("matches").document(str(match['id'])).set(match_data, merge=True)
+        count += 1
+    print(f"✅ Synced {count} matches to Firebase.")
 else:
     print("⚠️ No matches found in API response.")
 

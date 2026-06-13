@@ -129,17 +129,21 @@
                 
                 let count = 0;
                 for (let match of data.matches) {
-                    if (match.status !== "FINISHED" && match.status !== "AWARDED") {
-                        await setDoc(doc(db, "matches", match.id.toString()), {
-                            homeTeam: match.homeTeam.name || "TBD",
-                            awayTeam: match.awayTeam.name || "TBD",
-                            utcDate: match.utcDate,
-                            status: match.status
-                        });
-                        count++;
+                    const matchData = {
+                        homeTeam: match.homeTeam.name || "TBD",
+                        awayTeam: match.awayTeam.name || "TBD",
+                        utcDate: match.utcDate,
+                        status: match.status
+                    };
+                    
+                    if (match.score && match.score.fullTime && match.score.fullTime.home !== null) {
+                        matchData.score = match.score.fullTime;
                     }
+                    
+                    await setDoc(doc(db, "matches", match.id.toString()), matchData, { merge: true });
+                    count++;
                 }
-                showStatus(`✅ Success! Synced ${count} upcoming matches to DB.`, "success");
+                showStatus(`✅ Success! Synced ${count} matches to DB.`, "success");
             } catch (err) {
                 showStatus(`❌ Error: ${err.message}`, "error");
             }
