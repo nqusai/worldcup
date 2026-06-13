@@ -217,7 +217,13 @@
                                 matchPreds.forEach(p => {
                                     const isMe = p.user_id === currentUser.uid;
                                     const nameDisplay = isMe ? `<b>${p.user_name} (You)</b>` : p.user_name;
-                                    const pointString = p.points_awarded !== undefined ? ` <b style="color:green;">(+${p.points_awarded} pts)</b>` : "";
+                                    
+                                    // Make sure we show 0 points instead of blank if calculated, and nothing if not calculated
+                                    let pointString = "";
+                                    if (p.points_awarded !== undefined) {
+                                        pointString = p.points_awarded > 0 ? ` <b style="color:green;">(+${p.points_awarded} pts)</b>` : ` <span style="color:#888;">(+0 pts)</span>`;
+                                    }
+                                    
                                     html += `<li>${nameDisplay}: <b>${p.home_pred} - ${p.away_pred}</b>${pointString}</li>`;
                                 });
                             }
@@ -325,6 +331,10 @@
 
                     statusSpan.innerText = "✅ Saved";
                     statusSpan.style.color = "green";
+                    
+                    // Reload the dashboard to show the guess instantly!
+                    loadPlayerDashboard();
+                    
                     setTimeout(() => statusSpan.innerText = "", 3000);
                 } catch (err) {
                     statusSpan.innerText = "❌ Error";
