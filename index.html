@@ -39,8 +39,8 @@
     <!-- API Config Section (For testing without hardcoding keys) -->
     <div class="card" id="config-section">
         <h3 style="margin-top: 0;">API Configuration</h3>
-        <p style="font-size: 14px; color: #666;">Enter your RapidAPI Key for API-Football to load matches.</p>
-        <input type="password" id="api-key-input" placeholder="Enter RapidAPI Key" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+        <p style="font-size: 14px; color: #666;">Enter your direct API-Football Key to load matches.</p>
+        <input type="password" id="api-key-input" placeholder="Enter API Key" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
         <button id="save-key-btn">Save Key</button>
         <span id="key-status" style="margin-left: 10px; font-size: 14px;"></span>
     </div>
@@ -175,8 +175,8 @@
 
             try {
                 // Fetch matches
-                const response = await fetch(`https://api-football-v1.p.rapidapi.com/v3/fixtures?league=${LEAGUE_ID}&season=${SEASON}&status=NS&next=10`, {
-                    headers: { "X-RapidAPI-Key": rapidApiKey }
+                const response = await fetch(`https://v3.football.api-sports.io/fixtures?league=${LEAGUE_ID}&season=${SEASON}&status=NS&next=10`, {
+                    headers: { "x-apisports-key": rapidApiKey }
                 });
                 
                 if (!response.ok) throw new Error(`API Error: ${response.status}`);
@@ -320,8 +320,8 @@
 
             try {
                 // A. Get finished matches
-                const apiRes = await fetch(`https://api-football-v1.p.rapidapi.com/v3/fixtures?league=${LEAGUE_ID}&season=${SEASON}&status=FT`, {
-                    headers: { "X-RapidAPI-Key": rapidApiKey }
+                const apiRes = await fetch(`https://v3.football.api-sports.io/fixtures?league=${LEAGUE_ID}&season=${SEASON}&status=FT`, {
+                    headers: { "x-apisports-key": rapidApiKey }
                 });
                 
                 if (!apiRes.ok) throw new Error(`API Error: ${apiRes.status}`);
