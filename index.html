@@ -175,7 +175,7 @@
 
             try {
                 // Fetch matches
-                const response = await fetch(`https://v3.football.api-sports.io/fixtures?league=${LEAGUE_ID}&season=${SEASON}&status=NS&next=10`, {
+                const response = await fetch(`https://v3.football.api-sports.io/fixtures?league=${LEAGUE_ID}&season=${SEASON}&status=NS`, {
                     headers: { "x-apisports-key": rapidApiKey }
                 });
                 
