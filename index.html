@@ -186,8 +186,40 @@
                 let users = [];
                 usersSnap.forEach(doc => users.push(doc.data()));
 
-                // OPTIMIZATION: Stop pulling the API from the frontend. The GitHub Action handles this.
-                // We rely completely on the points_awarded field calculated by the backend.
+                // Calculate Points dynamically from Firebase data
+                let userScoresMap = {};
+                allPreds.forEach(pred => {
+                    if (!userScoresMap[pred.user_id]) {
+                        userScoresMap[pred.user_id] = { name: pred.user_name, points: 0, exactMatches: 0 };
+                    }
+
+                    const actualMatch = matches.find(m => m.id.toString() === pred.match_id.toString() && (m.status === 'FINISHED' || m.status === 'AWARDED'));
+                    
+                    if (actualMatch && actualMatch.score && actualMatch.score.home !== null) {
+                        const realHome = actualMatch.score.home;
+                        const realAway = actualMatch.score.away;
+                        const pHome = pred.home_pred;
+                        const pAway = pred.away_pred;
+
+                        let pts = 0;
+                        if (pHome === realHome && pAway === realAway) {
+                            pts = 3; 
+                            userScoresMap[pred.user_id].exactMatches++;
+                        } else if ((pHome - pAway) === (realHome - realAway)) {
+                            pts = 2; 
+                        } else if ((pHome > pAway && realHome > realAway) || (pHome < pAway && realHome < realAway)) {
+                            pts = 1; 
+                        }
+                        
+                        pred.points_awarded = pts; 
+                        userScoresMap[pred.user_id].points += pts;
+                    } else {
+                        pred.points_awarded = undefined;
+                    }
+                });
+
+                // Convert map to array for leaderboard sorting
+                users = Object.values(userScoresMap);
 
                 // Time definitions
                     const now = new Date().getTime();
