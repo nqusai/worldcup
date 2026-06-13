@@ -42,6 +42,7 @@
         <p style="font-size: 14px; color: #666;">Enter your football-data.org API Token to load matches.</p>
         <input type="password" id="api-key-input" placeholder="Enter API Token" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
         <button id="save-key-btn">Save Key</button>
+        <button id="reset-key-btn" style="background: #dc3545; margin-left: 5px;">Reset Key</button>
         <span id="key-status" style="margin-left: 10px; font-size: 14px;"></span>
     </div>
 
@@ -69,7 +70,19 @@
     </div>
 
     <!-- Application Logic -->
+    <footer id="app-footer" style="text-align: center; font-size: 12px; color: #aaa; margin-top: 40px; padding-bottom: 20px;">
+        <span id="version-number"></span>
+    </footer>
     <script type="module">
+        // Set Dynamic Version based on last modified date
+        const lastMod = new Date(document.lastModified);
+        const serial = lastMod.getFullYear().toString() + 
+                       (lastMod.getMonth() + 1).toString().padStart(2, '0') + 
+                       lastMod.getDate().toString().padStart(2, '0') + "." + 
+                       lastMod.getHours().toString().padStart(2, '0') + 
+                       lastMod.getMinutes().toString().padStart(2, '0');
+        document.getElementById("version-number").innerText = `Version: ${serial}`;
+
         // 1. Import Firebase v10 modules via CDN
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
@@ -110,6 +123,13 @@
                 rapidApiKey = key;
                 document.getElementById('key-status').innerHTML = "✅ Saved";
             }
+        });
+
+        document.getElementById('reset-key-btn').addEventListener('click', () => {
+            localStorage.removeItem('rapidApiKey');
+            rapidApiKey = "";
+            document.getElementById('api-key-input').value = "";
+            document.getElementById('key-status').innerHTML = "🗑️ Cleared";
         });
 
         // Helper to show messages
