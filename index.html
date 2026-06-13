@@ -47,7 +47,7 @@
     <!-- Upcoming Matches Section -->
     <div class="card" id="predictions-section" style="display: none;">
         <h2 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
-            Matches
+            Matches (Next 24 Hours)
             <button onclick="window.location.reload()" style="font-size: 12px; padding: 8px 15px;">Refresh</button>
         </h2>
         <p style="font-size: 13px; color: #666;">Predictions lock exactly 1 hour before kickoff. Once locked, everyone's guesses are revealed!</p>
@@ -137,15 +137,25 @@
                 let users = [];
                 usersSnap.forEach(doc => users.push(doc.data()));
 
+                // Time definitions
+                const now = new Date().getTime();
+                const next24 = now + (24 * 60 * 60 * 1000);
+
+                // Filter matches for next 24 hours (and not finished)
+                const upcomingMatches = matches.filter(m => 
+                    m.status !== 'FINISHED' && m.status !== 'AWARDED' && 
+                    new Date(m.utcDate).getTime() <= next24
+                );
+
                 // Render Matches
                 container.innerHTML = "";
-                if(matches.length === 0) {
-                    container.innerHTML = "<p>No matches loaded yet. Waiting for admin to sync.</p>";
+                if(upcomingMatches.length === 0) {
+                    container.innerHTML = "<p>No matches scheduled in the next 24 hours.</p>";
                 } else {
                     // Sort matches by date
-                    matches.sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
+                    upcomingMatches.sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
                     
-                    matches.forEach(match => {
+                    upcomingMatches.forEach(match => {
                         const matchDate = new Date(match.utcDate);
                         const msUntilKickoff = matchDate.getTime() - new Date().getTime();
                         const isLocked = msUntilKickoff <= 3600000; // 1 hour = 3600000 ms
