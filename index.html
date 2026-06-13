@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iPredictor</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f9; padding: 20px; max-width: 800px; margin: auto; color: #333; }
+        h1 { text-align: center; color: #2c3e50; }
+        .card { background: white; padding: 20px; margin-bottom: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        .match { display: flex; flex-direction: column; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px; border: 1px solid #e9ecef; }
+        .match-header { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .match-info { flex: 1; }
+        .match-inputs { display: flex; align-items: center; gap: 10px; }
+        
+        input[type="number"] { width: 45px; padding: 8px; text-align: center; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; }
+        input:disabled { background-color: #e9ecef; color: #6c757d; cursor: not-allowed; }
+        
+        button { background: #007aff; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: background 0.2s; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; color: #666; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #f8f9fa; font-weight: 600; }
+        
+        .status-badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; background: #e3f2fd; color: #495057; margin-bottom: 5px; }
+        .locked-badge { background: #dc3545; color: white; }
+        
+        .others-guesses { margin-top: 15px; padding: 10px; background: #e9ecef; border-radius: 6px; font-size: 13px; }
+        .others-guesses ul { margin: 5px 0 0 0; padding-left: 20px; }
+        
+        /* Mobile Optimization */
+        @media (max-width: 600px) {
+            .match-header { flex-direction: column; align-items: flex-start; }
+            .match-inputs { margin-top: 15px; width: 100%; justify-content: space-between; }
+            .match-inputs button { flex-grow: 1; margin-left: 10px; }
+            .score-box { font-size: 20px; padding: 5px 10px; margin-top: 10px; align-self: flex-start; }
+        }
+    </style>
+</head>
+<body>
+    <div id="app-root">
+        <h1>🏆 iPredictor</h1>
+
+        <!-- Player Account Section -->
+        <div class="card" id="auth-section">
+            <h3 style="margin-top: 0;">Player Account</h3>
+            <p id="user-info">Please log in to play.</p>
+            <button id="login-btn" style="display: inline-block;">Sign in with Google</button>
+            <button id="logout-btn" style="display: none; background: #dc3545;">Log out</button>
+        </div>
+
+        <!-- Upcoming Matches Section -->
+        <div class="card" id="predictions-section" style="display: none;">
+            <h2 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
+                Matches (Next 24 Hours)
+                <button onclick="window.location.reload()" style="font-size: 12px; padding: 8px 15px;">Refresh</button>
+            </h2>
+            <p style="font-size: 13px; color: #666;">Predictions lock exactly 1 hour before kickoff.</p>
+            <div id="matches-container"></div>
+        </div>
+
+        <!-- History Section -->
+        <div class="card" id="history-section" style="display: none;">
+            <details>
+                <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; outline: none; margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
+                    <span>📜 Match History</span>
+                    <span style="font-size: 0.5em; font-weight: normal; color: #666;">(Click to expand)</span>
+                </summary>
+                <div id="history-container" style="margin-top: 15px;">Loading history...</div>
+            </details>
+        </div>
+
+        <!-- Leaderboard Section -->
+        <div class="card" id="leaderboard-section">
+            <h2 style="margin-top: 0;">Live Leaderboard</h2>
+            <table>
+                <thead><tr><th>Player</th><th>Points</th></tr></thead>
+                <tbody id="leaderboard-body">
+                    <tr><td colspan="2" style="text-align: center; color: #666;">Waiting for data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Game Rules Section -->
+        <div class="card" id="rules-section">
+            <details>
+                <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; outline: none; margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
+                    <span>📖 Game Rules</span>
+                    <span style="font-size: 0.5em; font-weight: normal; color: #666;">(Click to expand)</span>
+                </summary>
+                <div style="margin-top: 15px; font-size: 14px; line-height: 1.5; color: #444;">
+                    <p>Guess the final score of every match. The closer you are, the more points you get.</p>
+                    
+                    <h4 style="margin-bottom: 5px; color: #2c3e50;">🔢 Scoring (3-2-1)</h4>
+                    <ul style="margin-top: 0; padding-left: 20px;">
+                        <li>🎯 <b>3 Points:</b> Exact final score <i>(e.g. guessed 2-1, finished 2-1)</i></li>
+                        <li>⚖️ <b>2 Points:</b> Correct winner + correct goal difference <i>(e.g. guessed 3-1, finished 2-0)</i></li>
+                        <li>✅ <b>1 Point:</b> Correct winner, wrong score <i>(e.g. guessed 1-0, finished 4-0)</i></li>
+                        <li>❌ <b>0 Points:</b> Wrong outcome</li>
+                    </ul>
+
+                    <h4 style="margin-bottom: 5px; color: #2c3e50;">⏰ How to Play</h4>
+                    <ul style="margin-top: 0; padding-left: 20px;">
+                        <li>🔒 Predictions <b>lock 1 hour before kickoff</b>.</li>
+                        <li>👀 Open cards! You can see everyone else's guesses under each match.</li>
+                        <li>⏳ The app only shows matches happening in the <b>next 24 hours</b>.</li>
+                    </ul>
+                </div>
+            </details>
+        </div>
+
+        <footer style="text-align: center; font-size: 12px; color: #aaa; margin-top: 40px; padding-bottom: 20px;">
+            <span id="version-number">v05 (Final Version)</span>
+        </footer>
+
+        <!-- Application Logic -->
+        <script type="module">
+            import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
+            import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
+            import { getFirestore, doc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+
+            // --- CONFIGURATION ---
+            const firebaseConfig = {
+                apiKey: "AIzaSyC9KFqUVsnOjTEX3dqZpgzh85kFALdGRYk",
+                authDomain: "worldcup-210fb.firebaseapp.com",
+                projectId: "worldcup-210fb",
+                storageBucket: "worldcup-210fb.firebasestorage.app",
+                messagingSenderId: "393380182317",
+                appId: "1:393380182317:web:8db9333afe2fe04fd4bba4"
+            };
+            
+            // Initialize Firebase
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+            const provider = new GoogleAuthProvider();
+
+            let currentUser = null;
+
+            // --- AUTHENTICATION ---
+            document.getElementById("login-btn").addEventListener("click", () => signInWithPopup(auth, provider));
+            document.getElementById("logout-btn").addEventListener("click", () => signOut(auth));
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    document.getElementById("user-info").innerText = `Logged in as: ${user.displayName}`;
+                    document.getElementById("login-btn").style.display = "none";
+                    document.getElementById("logout-btn").style.display = "inline-block";
+                    document.getElementById("predictions-section").style.display = "block";
+                    document.getElementById("history-section").style.display = "block";
+                    
+                    loadPlayerDashboard();
+                } else {
+                    currentUser = null;
+                    document.getElementById("user-info").innerText = "Please log in to play.";
+                    document.getElementById("login-btn").style.display = "inline-block";
+                    document.getElementById("logout-btn").style.display = "none";
+                    document.getElementById("predictions-section").style.display = "none";
+                    document.getElementById("history-section").style.display = "none";
+                    document.getElementById("matches-container").innerHTML = "";
+                }
+            });
+
+            // --- PLAYER FUNCTIONS (Reads entirely from Firebase) ---
+            async function loadPlayerDashboard() {
+                const container = document.getElementById("matches-container");
+                const historyContainer = document.getElementById("history-container");
+                const lbBody = document.getElementById("leaderboard-body");
+                
+                try {
+                    // 1. Fetch Matches from Firebase
+                const matchesSnap = await getDocs(collection(db, "matches"));
+                let matches = [];
+                matchesSnap.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
+                
+                // 2. Fetch all predictions from Firebase
+                const predsSnap = await getDocs(collection(db, "predictions"));
+                let allPreds = [];
+                predsSnap.forEach(doc => allPreds.push(doc.data()));
+
+                // 3. Fetch Leaderboard (Users collection)
+                const usersSnap = await getDocs(collection(db, "users"));
+                let users = [];
+                usersSnap.forEach(doc => users.push(doc.data()));
+
+                // Calculate Points dynamically from Firebase data
+                let userScoresMap = {};
+                allPreds.forEach(pred => {
+                    if (!userScoresMap[pred.user_id]) {
+                        userScoresMap[pred.user_id] = { name: pred.user_name, points: 0, exactMatches: 0 };
+                    }
+
+                    const actualMatch = matches.find(m => m.id.toString() === pred.match_id.toString() && (m.status === 'FINISHED' || m.status === 'AWARDED'));
+                    
+                    if (actualMatch && actualMatch.score && actualMatch.score.home !== null) {
+                        const realHome = actualMatch.score.home;
+                        const realAway = actualMatch.score.away;
+                        const pHome = pred.home_pred;
+                        const pAway = pred.away_pred;
+
+                        let pts = 0;
+                        if (pHome === realHome && pAway === realAway) {
+                            pts = 3; 
+                            userScoresMap[pred.user_id].exactMatches++;
+                        } else if ((pHome - pAway) === (realHome - realAway)) {
+                            pts = 2; 
+                        } else if ((pHome > pAway && realHome > realAway) || (pHome < pAway && realHome < realAway)) {
+                            pts = 1; 
+                        }
+                        
+                        pred.points_awarded = pts; 
+                        userScoresMap[pred.user_id].points += pts;
+                    } else {
+                        pred.points_awarded = undefined;
+                    }
+                });
+
+                // Convert map to array for leaderboard sorting
+                users = Object.values(userScoresMap);
+
+                // Time definitions
+                    const now = new Date().getTime();
+                    const next24 = now + (24 * 60 * 60 * 1000);
+
+                    // Split Matches into Upcoming and History
+                    const historyMatches = matches.filter(m => m.status === 'FINISHED' || m.status === 'AWARDED');
+                    const upcomingMatches = matches.filter(m => 
+                        m.status !== 'FINISHED' && m.status !== 'AWARDED' && 
+                        new Date(m.utcDate).getTime() <= next24
+                    );
+
+                    // ==========================================
+                    // RENDER UPCOMING MATCHES (Next 24 Hours)
+                    // ==========================================
+                    container.innerHTML = "";
+                    if(upcomingMatches.length === 0) {
+                        container.innerHTML = "<p>No matches scheduled in the next 24 hours.</p>";
+                    } else {
+                        upcomingMatches.sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
+                        
+                        upcomingMatches.forEach(match => {
+                            const matchDate = new Date(match.utcDate);
+                            const msUntilKickoff = matchDate.getTime() - now;
+                            const isLocked = msUntilKickoff <= 3600000; // 1 hour
+                            
+                            const myPred = allPreds.find(p => p.match_id === match.id && p.user_id === currentUser.uid);
+                            const homeVal = myPred ? myPred.home_pred : "";
+                            const awayVal = myPred ? myPred.away_pred : "";
+
+                            let html = `
+                                <div class="match">
+                                    <div class="match-header">
+                                        <div class="match-info">
+                                            <span class="status-badge ${isLocked ? 'locked-badge' : ''}">${isLocked ? '🔒 LOCKED' : match.status}</span><br>
+                                            <strong>${match.homeTeam}</strong> vs <strong>${match.awayTeam}</strong><br>
+                                            <small style="color: #666;">${matchDate.toLocaleString()}</small>
+                                        </div>
+                                        <div class="match-inputs">
+                                            <input type="number" id="home-${match.id}" value="${homeVal}" min="0" ${isLocked ? 'disabled' : ''}>
+                                            <span style="font-weight: bold;">-</span>
+                                            <input type="number" id="away-${match.id}" value="${awayVal}" min="0" ${isLocked ? 'disabled' : ''}>
+                                            <button id="btn-save-${match.id}" onclick="window.saveGuess('${match.id}')" ${isLocked ? 'disabled' : ''}>
+                                                ${isLocked ? 'Locked' : (myPred ? 'Update' : 'Save')}
+                                            </button>
+                                            <span id="status-${match.id}" style="font-size: 12px; width: 50px;"></span>
+                                        </div>
+                                    </div>
+                            `;
+
+                            // Reveal guesses only if locked (or if it's the current user's guess)
+                            const matchPreds = allPreds.filter(p => p.match_id === match.id);
+                            html += `<div class="others-guesses"><strong>Everyone's Guesses:</strong><ul>`;
+                            if(matchPreds.length === 0) {
+                                html += `<li><span style="color:#888;">No predictions yet.</span></li>`;
+                            } else {
+                                matchPreds.forEach(p => {
+                                    const isMe = p.user_id === currentUser.uid;
+                                    const nameDisplay = isMe ? `<b>${p.user_name} (You)</b>` : p.user_name;
+                                    
+                                    let predDisplay = "";
+                                    if (isLocked || isMe) {
+                                        predDisplay = `<b>${p.home_pred} - ${p.away_pred}</b>`;
+                                    } else {
+                                        predDisplay = `<i style="color:#888;">Hidden until locked</i>`;
+                                    }
+                                    
+                                    html += `<li>${nameDisplay}: ${predDisplay}</li>`;
+                                });
+                            }
+                            html += `</ul></div></div>`;
+                            container.innerHTML += html;
+                        });
+                    }
+
+                    // ==========================================
+                    // RENDER HISTORY MATCHES (Finished)
+                    // ==========================================
+                    historyContainer.innerHTML = "";
+                    if(historyMatches.length === 0) {
+                        historyContainer.innerHTML = "<p>No finished matches yet.</p>";
+                    } else {
+                        // Sort newest finished first
+                        historyMatches.sort((a,b) => new Date(b.utcDate) - new Date(a.utcDate));
+                        
+                        historyMatches.forEach(match => {
+                            const matchDate = new Date(match.utcDate);
+                            const realHome = match.score && match.score.home !== null ? match.score.home : '-';
+                            const realAway = match.score && match.score.away !== null ? match.score.away : '-';
+                            
+                            let html = `
+                                <div class="match" style="background: #e9ecef; border-color: #ced4da;">
+                                    <div class="match-header">
+                                        <div class="match-info">
+                                            <span class="status-badge" style="background: #6c757d; color: white;">FINISHED</span><br>
+                                            <strong>${match.homeTeam}</strong> vs <strong>${match.awayTeam}</strong><br>
+                                            <small style="color: #666;">${matchDate.toLocaleString()}</small>
+                                        </div>
+                                        <div class="score-box" style="font-size: 24px; font-weight: bold; padding: 0 20px; background: white; border-radius: 8px; border: 1px solid #ccc; min-width: 60px; text-align: center;">
+                                            ${realHome} - ${realAway}
+                                        </div>
+                                    </div>
+                            `;
+
+                            const matchPreds = allPreds.filter(p => p.match_id === match.id);
+                            html += `<div class="others-guesses" style="background: white; border: 1px solid #ced4da;"><strong>Players' Guesses & Points:</strong><ul>`;
+                            if(matchPreds.length === 0) {
+                                html += `<li><span style="color:#888;">No predictions were made.</span></li>`;
+                            } else {
+                                // Sort by highest points earned on this match
+                                matchPreds.sort((a,b) => (b.points_awarded || 0) - (a.points_awarded || 0));
+                                
+                                matchPreds.forEach(p => {
+                                    const isMe = p.user_id === currentUser.uid;
+                                    const nameDisplay = isMe ? `<b>${p.user_name} (You)</b>` : p.user_name;
+                                    const pts = p.points_awarded || 0;
+                                    const pointString = pts > 0 ? ` <b style="color:green;">(+${pts} pts)</b>` : ` <span style="color:#888;">(+0 pts)</span>`;
+                                    html += `<li>${nameDisplay}: <b>${p.home_pred} - ${p.away_pred}</b>${pointString}</li>`;
+                                });
+                            }
+                            html += `</ul></div></div>`;
+                            historyContainer.innerHTML += html;
+                        });
+                    }
+
+                    // Render Leaderboard
+                    lbBody.innerHTML = "";
+                    users.sort((a,b) => b.points - a.points); // Sort by points
+                    if(users.length === 0) {
+                        lbBody.innerHTML = "<tr><td colspan='2' style='text-align: center;'>No players yet.</td></tr>";
+                    } else {
+                        users.forEach((u, index) => {
+                            let medal = index === 0 ? "🥇 " : index === 1 ? "🥈 " : index === 2 ? "🥉 " : "";
+                            lbBody.innerHTML += `
+                                <tr>
+                                    <td>${medal}${u.name}</td>
+                                    <td><b style="font-size: 1.1em; color: #007aff;">${u.points || 0}</b></td>
+                                </tr>
+                            `;
+                        });
+                    }
+
+                } catch (err) {
+                    console.error(err);
+                    container.innerHTML = `<p class="error">Error loading dashboard: ${err.message}</p>`;
+                }
+            }
+
+            // Save Guess (Only works if not locked)
+            window.saveGuess = async function(matchId) {
+                const h = document.getElementById(`home-${matchId}`).value;
+                const a = document.getElementById(`away-${matchId}`).value;
+                const statusSpan = document.getElementById(`status-${matchId}`);
+                
+                if (h === "" || a === "") return alert("Enter both scores!");
+                statusSpan.innerText = "Saving...";
+                
+                const predId = `${currentUser.uid}_${matchId}`;
+                try {
+                    await setDoc(doc(db, "predictions", predId), {
+                        user_id: currentUser.uid,
+                        user_name: currentUser.displayName,
+                        match_id: matchId,
+                        home_pred: parseInt(h),
+                        away_pred: parseInt(a)
+                    }, { merge: true });
+                    
+                    // Ensure user exists in leaderboard DB
+                    await setDoc(doc(db, "users", currentUser.uid), {
+                        name: currentUser.displayName
+                    }, { merge: true });
+
+                    statusSpan.innerText = "✅ Saved";
+                    statusSpan.style.color = "green";
+                    
+                    // Reload the dashboard to show the guess instantly!
+                    loadPlayerDashboard();
+                    
+                    setTimeout(() => statusSpan.innerText = "", 3000);
+                } catch (err) {
+                    statusSpan.innerText = "❌ Error";
+                    alert(err.message);
+                }
+            };
+        </script>
+    </div>
+
+</body></html>
