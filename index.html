@@ -74,14 +74,9 @@
         <span id="version-number"></span>
     </footer>
     <script type="module">
-        // Set Dynamic Version based on last modified date
-        const lastMod = new Date(document.lastModified);
-        const serial = lastMod.getFullYear().toString() + 
-                       (lastMod.getMonth() + 1).toString().padStart(2, '0') + 
-                       lastMod.getDate().toString().padStart(2, '0') + "." + 
-                       lastMod.getHours().toString().padStart(2, '0') + 
-                       lastMod.getMinutes().toString().padStart(2, '0');
-        document.getElementById("version-number").innerText = `Version: ${serial}`;
+        // Version Control
+        const VERSION = "01";
+        document.getElementById("version-number").innerText = `v${VERSION}`;
 
         // 1. Import Firebase v10 modules via CDN
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
@@ -193,8 +188,11 @@
             btn.disabled = true;
 
             try {
-                // Fetch matches from football-data.org (Get all matches to ensure we don't miss live ones)
-                const response = await fetch(`https://api.football-data.org/v4/competitions/${COMPETITION_CODE}/matches`, {
+                // Fetch matches from football-data.org (using a CORS proxy)
+                const proxyUrl = 'https://corsproxy.io/?';
+                const targetUrl = `https://api.football-data.org/v4/competitions/${COMPETITION_CODE}/matches`;
+                
+                const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
                     headers: { "X-Auth-Token": rapidApiKey }
                 });
                 
@@ -337,8 +335,11 @@
             btn.disabled = true;
 
             try {
-                // A. Get finished matches
-                const apiRes = await fetch(`https://api.football-data.org/v4/competitions/${COMPETITION_CODE}/matches?status=FINISHED`, {
+                // A. Get finished matches (using CORS proxy)
+                const proxyUrl = 'https://corsproxy.io/?';
+                const targetUrl = `https://api.football-data.org/v4/competitions/${COMPETITION_CODE}/matches?status=FINISHED`;
+                
+                const apiRes = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
                     headers: { "X-Auth-Token": rapidApiKey }
                 });
                 
