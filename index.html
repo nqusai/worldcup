@@ -41,7 +41,8 @@
 </head>
 <body>
     <div id="app-root">
-        <h1>🏆 iPredictor</h1>
+        <h1 style="margin-bottom: 5px;">🏆 iPredictor</h1>
+        <p id="header-user-name" style="text-align: center; color: #888; font-size: 14px; margin-top: 0; margin-bottom: 20px; display: none;"></p>
 
         <!-- Initial Login View (Visible when not logged in) -->
         <div class="card" id="initial-login-section" style="text-align: center; padding: 40px 20px;">
@@ -53,67 +54,57 @@
         <!-- The Main App Content (Hidden until logged in) -->
         <div id="main-app-content" style="display: none;">
             
-            <!-- Upcoming Matches Section (1) -->
-            <div class="card" id="predictions-section">
-            <h2 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
-                Matches (Next 24 Hours)
-                <button onclick="window.location.reload()" style="font-size: 12px; padding: 8px 15px;">Refresh</button>
-            </h2>
-            <p style="font-size: 13px; color: #666;">Predictions lock exactly 1 hour before kickoff.</p>
-            <div id="matches-container">Loading games...</div>
-        </div>
+            <!-- Leaderboard Section (1) -->
+            <div class="card" id="leaderboard-section">
+                <h2 style="margin-top: 0;">Live Leaderboard</h2>
+                <table>
+                    <thead><tr><th>Player</th><th>Points</th></tr></thead>
+                    <tbody id="leaderboard-body">
+                        <tr><td colspan="2" style="text-align: center; color: #666;">Waiting for data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
 
-        <!-- Leaderboard Section (2) -->
-        <div class="card" id="leaderboard-section">
-            <h2 style="margin-top: 0;">Live Leaderboard</h2>
-            <table>
-                <thead><tr><th>Player</th><th>Points</th></tr></thead>
-                <tbody id="leaderboard-body">
-                    <tr><td colspan="2" style="text-align: center; color: #666;">Waiting for data...</td></tr>
-                </tbody>
-            </table>
-        </div>
+            <!-- Match History Section (2) -->
+            <div class="card" id="history-section">
+                <details>
+                    <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; outline: none; margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
+                        <span>📜 Match History</span>
+                        <span style="font-size: 0.5em; font-weight: normal; color: #666;">(Click to expand)</span>
+                    </summary>
+                    <div id="history-container" style="margin-top: 15px;">Loading history...</div>
+                </details>
+            </div>
 
-        <!-- History Section (3) -->
-        <div class="card" id="history-section" style="display: none;">
-            <details>
-                <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; outline: none; margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
-                    <span>📜 Match History</span>
-                    <span style="font-size: 0.5em; font-weight: normal; color: #666;">(Click to expand)</span>
-                </summary>
-                <div id="history-container" style="margin-top: 15px;">Loading history...</div>
-            </details>
-        </div>
+            <!-- Game Rules Section (3) -->
+            <div class="card" id="rules-section">
+                <details>
+                    <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; outline: none; margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
+                        <span>📖 Game Rules</span>
+                        <span style="font-size: 0.5em; font-weight: normal; color: #666;">(Click to expand)</span>
+                    </summary>
+                    <div style="margin-top: 15px; font-size: 14px; line-height: 1.5; color: #444;">
+                        <p>Guess the final score of every match. The closer you are, the more points you get.</p>
+                        
+                        <h4 style="margin-bottom: 5px; color: #2c3e50;">🔢 Scoring (3-2-1)</h4>
+                        <ul style="margin-top: 0; padding-left: 20px;">
+                            <li>🎯 <b>3 Points:</b> Exact final score <i>(e.g. guessed 2-1, finished 2-1)</i></li>
+                            <li>⚖️ <b>2 Points:</b> Correct winner + correct goal difference <i>(e.g. guessed 3-1, finished 2-0)</i></li>
+                            <li>✅ <b>1 Point:</b> Correct winner, wrong score <i>(e.g. guessed 1-0, finished 4-0)</i></li>
+                            <li>❌ <b>0 Points:</b> Wrong outcome</li>
+                        </ul>
 
-        <!-- Game Rules Section (4) -->
-        <div class="card" id="rules-section">
-            <details>
-                <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; outline: none; margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
-                    <span>📖 Game Rules</span>
-                    <span style="font-size: 0.5em; font-weight: normal; color: #666;">(Click to expand)</span>
-                </summary>
-                <div style="margin-top: 15px; font-size: 14px; line-height: 1.5; color: #444;">
-                    <p>Guess the final score of every match. The closer you are, the more points you get.</p>
-                    
-                    <h4 style="margin-bottom: 5px; color: #2c3e50;">🔢 Scoring (3-2-1)</h4>
-                    <ul style="margin-top: 0; padding-left: 20px;">
-                        <li>🎯 <b>3 Points:</b> Exact final score <i>(e.g. guessed 2-1, finished 2-1)</i></li>
-                        <li>⚖️ <b>2 Points:</b> Correct winner + correct goal difference <i>(e.g. guessed 3-1, finished 2-0)</i></li>
-                        <li>✅ <b>1 Point:</b> Correct winner, wrong score <i>(e.g. guessed 1-0, finished 4-0)</i></li>
-                        <li>❌ <b>0 Points:</b> Wrong outcome</li>
-                    </ul>
+                        <h4 style="margin-bottom: 5px; color: #2c3e50;">⏰ How to Play</h4>
+                        <ul style="margin-top: 0; padding-left: 20px;">
+                            <li>🔒 Predictions <b>lock 1 hour before kickoff</b>.</li>
+                            <li>👀 Open cards! You can see everyone else's guesses under each match.</li>
+                            <li>⏳ The app only shows matches happening in the <b>next 24 hours</b>.</li>
+                        </ul>
+                    </div>
+                </details>
+            </div>
 
-                    <h4 style="margin-bottom: 5px; color: #2c3e50;">⏰ How to Play</h4>
-                    <ul style="margin-top: 0; padding-left: 20px;">
-                        <li>🔒 Predictions <b>lock 1 hour before kickoff</b>.</li>
-                        <li>👀 Open cards! You can see everyone else's guesses under each match.</li>
-                        <li>⏳ The app only shows matches happening in the <b>next 24 hours</b>.</li>
-                    </ul>
-                </div>
-            </details>
-        </div>
-
-        <!-- Player Account Section (Now the last card) -->
+            <!-- Player Account Section (4 - Now at the bottom) -->
             <div class="card" id="auth-section">
                 <h3 style="margin-top: 0;">Player Account</h3>
                 <p id="user-info">Logged in.</p>
@@ -164,6 +155,11 @@
                     
                     document.getElementById("user-info").innerText = `Logged in as: ${user.displayName}`;
                     
+                    // Show name under main title
+                    const headerName = document.getElementById("header-user-name");
+                    headerName.innerText = user.displayName;
+                    headerName.style.display = "block";
+                    
                     loadPlayerDashboard();
                 } else {
                     currentUser = null;
@@ -171,6 +167,8 @@
                     // Show initial login, hide main app
                     document.getElementById("initial-login-section").style.display = "block";
                     document.getElementById("main-app-content").style.display = "none";
+                    
+                    document.getElementById("header-user-name").style.display = "none";
                     
                     document.getElementById("matches-container").innerHTML = "";
                 }
@@ -231,7 +229,6 @@
                                 <div class="match">
                                     <div class="match-header">
                                         <div class="match-info">
-                                            <span class="status-badge ${isLocked ? 'locked-badge' : ''}">${isLocked ? '🔒 LOCKED' : match.status}</span><br>
                                             <strong>${match.homeTeam}</strong> vs <strong>${match.awayTeam}</strong><br>
                                             <small style="color: #666;">${matchDate.toLocaleString()}</small>
                                         </div>
@@ -290,7 +287,6 @@
                                 <div class="match" style="background: #e9ecef; border-color: #ced4da;">
                                     <div class="match-header">
                                         <div class="match-info">
-                                            <span class="status-badge" style="background: #6c757d; color: white;">FINISHED</span><br>
                                             <strong>${match.homeTeam}</strong> vs <strong>${match.awayTeam}</strong><br>
                                             <small style="color: #666;">${matchDate.toLocaleString()}</small>
                                         </div>
