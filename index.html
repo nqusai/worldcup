@@ -8,82 +8,74 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f9; padding: 20px; max-width: 800px; margin: auto; color: #333; }
         h1 { text-align: center; color: #2c3e50; }
         .card { background: white; padding: 20px; margin-bottom: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .match { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px; border: 1px solid #e9ecef; }
+        
+        .match { display: flex; flex-direction: column; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px; border: 1px solid #e9ecef; }
+        .match-header { display: flex; justify-content: space-between; align-items: center; width: 100%; }
         .match-info { flex: 1; }
         .match-inputs { display: flex; align-items: center; gap: 10px; }
-        input[type="number"] { width: 50px; padding: 8px; text-align: center; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; }
+        
+        input[type="number"] { width: 45px; padding: 8px; text-align: center; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; }
+        input:disabled { background-color: #e9ecef; color: #6c757d; cursor: not-allowed; }
+        
         button { background: #007aff; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: background 0.2s; }
         button:hover { background: #0056b3; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
+        button:disabled { background: #ccc; cursor: not-allowed; color: #666; }
+        
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background-color: #f8f9fa; font-weight: 600; }
+        
         .status-badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; background: #e3f2fd; color: #495057; margin-bottom: 5px; }
-        .error { color: #dc3545; padding: 10px; background: #f8d7da; border-radius: 6px; margin-top: 10px; }
-        .success { color: #28a745; padding: 10px; background: #d4edda; border-radius: 6px; margin-top: 10px; }
+        .locked-badge { background: #dc3545; color: white; }
+        
+        .others-guesses { margin-top: 15px; padding: 10px; background: #e9ecef; border-radius: 6px; font-size: 13px; }
+        .others-guesses ul { margin: 5px 0 0 0; padding-left: 20px; }
     </style>
 </head>
 <body>
 
     <h1>🏆 World Cup Predictor</h1>
 
-    <!-- Authentication Section -->
+    <!-- Player Account Section -->
     <div class="card" id="auth-section">
         <h3 style="margin-top: 0;">Player Account</h3>
         <p id="user-info">Please log in to play.</p>
         <button id="login-btn">Sign in with Google</button>
         <button id="logout-btn" style="display: none; background: #dc3545;">Log out</button>
-        <div id="auth-msg"></div>
-    </div>
-
-    <!-- API Config Section (For testing without hardcoding keys) -->
-    <div class="card" id="config-section">
-        <h3 style="margin-top: 0;">API Configuration</h3>
-        <p style="font-size: 14px; color: #666;">Enter your football-data.org API Token to load matches.</p>
-        <input type="password" id="api-key-input" placeholder="Enter API Token" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
-        <button id="save-key-btn">Save Key</button>
-        <button id="reset-key-btn" style="background: #dc3545; margin-left: 5px;">Reset Key</button>
-        <span id="key-status" style="margin-left: 10px; font-size: 14px;"></span>
     </div>
 
     <!-- Upcoming Matches Section -->
     <div class="card" id="predictions-section" style="display: none;">
-        <h2 style="display: flex; justify-content: space-between; align-items: center; margin-top: 0;">
-            Upcoming Matches
-            <button id="load-matches-btn" style="font-size: 12px; padding: 8px 15px;">Refresh Matches</button>
+        <h2 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
+            Matches
+            <button onclick="window.location.reload()" style="font-size: 12px; padding: 8px 15px;">Refresh</button>
         </h2>
-        <div id="matches-container"><p style="color: #666;">Click refresh to load matches.</p></div>
+        <p style="font-size: 13px; color: #666;">Predictions lock exactly 1 hour before kickoff. Once locked, everyone's guesses are revealed!</p>
+        <div id="matches-container">Loading games...</div>
     </div>
 
     <!-- Leaderboard Section -->
     <div class="card" id="leaderboard-section">
-        <h2 style="display: flex; justify-content: space-between; align-items: center; margin-top: 0;">
-            Live Leaderboard
-            <button id="load-leaderboard-btn" style="font-size: 12px; padding: 8px 15px;">Refresh Leaderboard</button>
-        </h2>
+        <h2 style="margin-top: 0;">Live Leaderboard</h2>
         <table>
             <thead><tr><th>Player</th><th>Points</th></tr></thead>
             <tbody id="leaderboard-body">
-                <tr><td colspan="2" style="text-align: center; color: #666;">Click refresh to calculate scores.</td></tr>
+                <tr><td colspan="2" style="text-align: center; color: #666;">Waiting for data...</td></tr>
             </tbody>
         </table>
     </div>
 
-    <!-- Application Logic -->
-    <footer id="app-footer" style="text-align: center; font-size: 12px; color: #aaa; margin-top: 40px; padding-bottom: 20px;">
-        <span id="version-number"></span>
+    <footer style="text-align: center; font-size: 12px; color: #aaa; margin-top: 40px; padding-bottom: 20px;">
+        <span id="version-number">v03 (Player Client)</span>
     </footer>
-    <script type="module">
-        // Version Control
-        const VERSION = "01";
-        document.getElementById("version-number").innerText = `v${VERSION}`;
 
-        // 1. Import Firebase v10 modules via CDN
+    <!-- Application Logic -->
+    <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
-        import { getFirestore, doc, setDoc, collection, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
-        // 2. Firebase Configuration
+        // --- CONFIGURATION ---
         const firebaseConfig = {
             apiKey: "AIzaSyC9KFqUVsnOjTEX3dqZpgzh85kFALdGRYk",
             authDomain: "worldcup-210fb.firebaseapp.com",
@@ -92,329 +84,172 @@
             messagingSenderId: "393380182317",
             appId: "1:393380182317:web:8db9333afe2fe04fd4bba4"
         };
-
-        // 3. Football API Settings
-        const COMPETITION_CODE = "WC"; // World Cup code in football-data.org
-
-        // 4. Initialize Firebase
+        
+        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const provider = new GoogleAuthProvider();
 
         let currentUser = null;
-        let rapidApiKey = localStorage.getItem('rapidApiKey') || "";
 
-        // UI Setup for API Key
-        if (rapidApiKey) {
-            document.getElementById('api-key-input').value = rapidApiKey;
-            document.getElementById('key-status').innerHTML = "✅ Saved";
-        }
-
-        document.getElementById('save-key-btn').addEventListener('click', () => {
-            const key = document.getElementById('api-key-input').value.trim();
-            if (key) {
-                localStorage.setItem('rapidApiKey', key);
-                rapidApiKey = key;
-                document.getElementById('key-status').innerHTML = "✅ Saved";
-            }
-        });
-
-        document.getElementById('reset-key-btn').addEventListener('click', () => {
-            localStorage.removeItem('rapidApiKey');
-            rapidApiKey = "";
-            document.getElementById('api-key-input').value = "";
-            document.getElementById('key-status').innerHTML = "🗑️ Cleared";
-        });
-
-        // Helper to show messages
-        function showMessage(elementId, text, type) {
-            const el = document.getElementById(elementId);
-            if (!el) {
-                const newEl = document.createElement('div');
-                newEl.id = elementId;
-                newEl.className = type;
-                newEl.innerText = text;
-                document.getElementById('auth-section').appendChild(newEl);
-            } else {
-                el.className = type;
-                el.innerText = text;
-                el.style.display = 'block';
-            }
-            setTimeout(() => {
-                const msgEl = document.getElementById(elementId);
-                if(msgEl) msgEl.style.display = 'none';
-            }, 5000);
-        }
-
-        // 5. Authentication Logic
-        document.getElementById("login-btn").addEventListener("click", () => {
-            signInWithPopup(auth, provider).catch(err => {
-                console.error("Login failed:", err);
-                showMessage('auth-msg', `Login Error: ${err.message}`, 'error');
-            });
-        });
-
-        document.getElementById("logout-btn").addEventListener("click", () => {
-            signOut(auth);
-        });
+        // --- AUTHENTICATION ---
+        document.getElementById("login-btn").addEventListener("click", () => signInWithPopup(auth, provider));
+        document.getElementById("logout-btn").addEventListener("click", () => signOut(auth));
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
-                document.getElementById("user-info").innerText = `Logged in as: ${user.displayName} (${user.email})`;
+                document.getElementById("user-info").innerText = `Logged in as: ${user.displayName}`;
                 document.getElementById("login-btn").style.display = "none";
                 document.getElementById("logout-btn").style.display = "inline-block";
                 document.getElementById("predictions-section").style.display = "block";
+                
+                loadPlayerDashboard();
             } else {
                 currentUser = null;
                 document.getElementById("user-info").innerText = "Please log in to play.";
                 document.getElementById("login-btn").style.display = "inline-block";
                 document.getElementById("logout-btn").style.display = "none";
                 document.getElementById("predictions-section").style.display = "none";
+                document.getElementById("matches-container").innerHTML = "";
             }
         });
 
-        // 6. Fetch Upcoming Games & Create Input Cards
-        document.getElementById("load-matches-btn").addEventListener("click", async () => {
-            if (!rapidApiKey) {
-                alert("Please enter and save your RapidAPI Key first.");
-                return;
-            }
-
+        // --- PLAYER FUNCTIONS (Reads entirely from Firebase) ---
+        async function loadPlayerDashboard() {
             const container = document.getElementById("matches-container");
-            const btn = document.getElementById("load-matches-btn");
-            container.innerHTML = "<p>Fetching matches from API...</p>";
-            btn.disabled = true;
-
-            try {
-                // Fetch matches from football-data.org (using a CORS proxy)
-                const proxyUrl = 'https://corsproxy.io/?';
-                const targetUrl = `https://api.football-data.org/v4/competitions/${COMPETITION_CODE}/matches`;
-                
-                const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
-                    headers: { "X-Auth-Token": rapidApiKey }
-                });
-                
-                if (!response.ok) throw new Error(`API Error: ${response.status}`);
-                const data = await response.json();
-                
-                // Filter for matches that haven't finished yet (SCHEDULED, TIMED, IN_PLAY, PAUSED)
-                const upcomingMatches = data.matches ? data.matches.filter(m => m.status !== 'FINISHED' && m.status !== 'AWARDED') : [];
-                
-                if (upcomingMatches.length === 0) {
-                    container.innerHTML = "<p>No upcoming or live matches found for the World Cup at this moment.</p>";
-                    btn.disabled = false;
-                    return;
-                }
-
-                // Fetch existing predictions for this user
-                let userPredictions = {};
-                if (currentUser) {
-                    try {
-                        const querySnapshot = await getDocs(collection(db, "predictions"));
-                        querySnapshot.forEach(doc => {
-                            const p = doc.data();
-                            if (p.user_id === currentUser.uid) {
-                                userPredictions[p.match_id] = p;
-                            }
-                        });
-                    } catch (e) {
-                        console.warn("Could not fetch existing predictions", e);
-                    }
-                }
-
-                const matches = upcomingMatches;
-                container.innerHTML = ""; 
-
-                matches.slice(0, 15).forEach(match => {
-                    const mId = match.id;
-                    const homeTeam = match.homeTeam.name || "TBD";
-                    const awayTeam = match.awayTeam.name || "TBD";
-                    const matchDate = new Date(match.utcDate);
-                    
-                    // Check if user already predicted
-                    const existingPred = userPredictions[mId];
-                    const homeVal = existingPred ? existingPred.home_pred : "";
-                    const awayVal = existingPred ? existingPred.away_pred : "";
-                    const btnText = existingPred ? "Update" : "Save";
-                    
-                    const matchDiv = document.createElement("div");
-                    matchDiv.className = "match";
-                    matchDiv.innerHTML = `
-                        <div class="match-info">
-                            <span class="status-badge">${match.status}</span><br>
-                            <strong>${homeTeam}</strong> vs <strong>${awayTeam}</strong><br>
-                            <small style="color: #666;">${matchDate.toLocaleString()}</small>
-                        </div>
-                        <div class="match-inputs">
-                            <div style="display: flex; flex-direction: column; align-items: center;">
-                                <small>${homeTeam.substring(0,3).toUpperCase()}</small>
-                                <input type="number" id="home-${mId}" value="${homeVal}" min="0">
-                            </div>
-                            <span style="font-weight: bold;">-</span>
-                            <div style="display: flex; flex-direction: column; align-items: center;">
-                                <small>${awayTeam.substring(0,3).toUpperCase()}</small>
-                                <input type="number" id="away-${mId}" value="${awayVal}" min="0">
-                            </div>
-                            <button id="btn-save-${mId}" onclick="window.saveGuess(${mId})">${btnText}</button>
-                            <span id="status-${mId}" style="font-size: 12px; margin-left: 5px; width: 60px;"></span>
-                        </div>
-                    `;
-                    container.appendChild(matchDiv);
-                });
-            } catch (error) {
-                console.error(error);
-                container.innerHTML = `<div class="error">Error loading matches: ${error.message}</div>`;
-            } finally {
-                btn.disabled = false;
-            }
-        });
-
-        // 7. Save Prediction to Firebase
-        window.saveGuess = async function(matchId) {
-            if (!currentUser) return alert("You must be logged in to save predictions!");
-
-            const homeInput = document.getElementById(`home-${matchId}`);
-            const awayInput = document.getElementById(`away-${matchId}`);
-            const statusSpan = document.getElementById(`status-${matchId}`);
-            const btn = document.getElementById(`btn-save-${matchId}`);
-
-            const homeGoals = homeInput.value;
-            const awayGoals = awayInput.value;
-
-            if (homeGoals === "" || awayGoals === "") {
-                statusSpan.innerHTML = "⚠️ Fill both";
-                statusSpan.style.color = "red";
-                return;
-            }
-
-            btn.disabled = true;
-            statusSpan.innerHTML = "Saving...";
-            statusSpan.style.color = "#666";
-
-            const predictionId = `${currentUser.uid}_${matchId}`;
-
-            try {
-                await setDoc(doc(db, "predictions", predictionId), {
-                    user_id: currentUser.uid,
-                    user_name: currentUser.displayName || "Unknown User", 
-                    match_id: matchId,
-                    home_pred: parseInt(homeGoals),
-                    away_pred: parseInt(awayGoals),
-                    updated_at: new Date().toISOString()
-                });
-                
-                statusSpan.innerHTML = "✅ Saved!";
-                statusSpan.style.color = "green";
-                btn.innerText = "Update";
-            } catch (error) {
-                console.error("Error saving to Firebase:", error);
-                statusSpan.innerHTML = "❌ Error";
-                statusSpan.style.color = "red";
-                alert(`Failed to save: ${error.message}. Check Firebase rules.`);
-            } finally {
-                btn.disabled = false;
-                setTimeout(() => {
-                    if(statusSpan.innerHTML.includes("Saved")) statusSpan.innerHTML = "";
-                }, 3000);
-            }
-        };
-
-        // 8. Calculate & Render Leaderboard
-        document.getElementById("load-leaderboard-btn").addEventListener("click", async () => {
-            if (!rapidApiKey) {
-                alert("Please enter and save your RapidAPI Key first.");
-                return;
-            }
-
-            const tbody = document.getElementById("leaderboard-body");
-            const btn = document.getElementById("load-leaderboard-btn");
+            const lbBody = document.getElementById("leaderboard-body");
             
-            tbody.innerHTML = "<tr><td colspan='2' style='text-align: center;'>Fetching results & calculating...</td></tr>";
-            btn.disabled = true;
-
             try {
-                // A. Get finished matches (using CORS proxy)
-                const proxyUrl = 'https://corsproxy.io/?';
-                const targetUrl = `https://api.football-data.org/v4/competitions/${COMPETITION_CODE}/matches?status=FINISHED`;
+                // 1. Fetch Matches from Firebase (Admin puts them here)
+                const matchesSnap = await getDocs(collection(db, "matches"));
+                let matches = [];
+                matchesSnap.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
                 
-                const apiRes = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
-                    headers: { "X-Auth-Token": rapidApiKey }
-                });
-                
-                if (!apiRes.ok) throw new Error(`API Error: ${apiRes.status}`);
-                
-                const apiData = await apiRes.json();
-                const finishedMatches = apiData.matches || [];
+                // 2. Fetch all predictions from Firebase
+                const predsSnap = await getDocs(collection(db, "predictions"));
+                let allPreds = [];
+                predsSnap.forEach(doc => allPreds.push(doc.data()));
 
-                // B. Get all predictions from Firebase
-                const querySnapshot = await getDocs(collection(db, "predictions"));
-                const predictions = [];
-                querySnapshot.forEach(doc => predictions.push(doc.data()));
+                // 3. Fetch Leaderboard (Users collection)
+                const usersSnap = await getDocs(collection(db, "users"));
+                let users = [];
+                usersSnap.forEach(doc => users.push(doc.data()));
 
-                // C. Calculate Points
-                let userScores = {}; 
-
-                predictions.forEach(pred => {
-                    if (!userScores[pred.user_id]) {
-                        userScores[pred.user_id] = { name: pred.user_name, points: 0, exactMatches: 0 };
-                    }
-
-                    const actualMatch = finishedMatches.find(m => m.id === pred.match_id);
+                // Render Matches
+                container.innerHTML = "";
+                if(matches.length === 0) {
+                    container.innerHTML = "<p>No matches loaded yet. Waiting for admin to sync.</p>";
+                } else {
+                    // Sort matches by date
+                    matches.sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
                     
-                    if (actualMatch && actualMatch.score && actualMatch.score.fullTime) {
-                        const realHome = actualMatch.score.fullTime.home;
-                        const realAway = actualMatch.score.fullTime.away;
-                        const pHome = pred.home_pred;
-                        const pAway = pred.away_pred;
+                    matches.forEach(match => {
+                        const matchDate = new Date(match.utcDate);
+                        const msUntilKickoff = matchDate.getTime() - new Date().getTime();
+                        const isLocked = msUntilKickoff <= 3600000; // 1 hour = 3600000 ms
+                        
+                        // Find user's own prediction
+                        const myPred = allPreds.find(p => p.match_id === match.id && p.user_id === currentUser.uid);
+                        const homeVal = myPred ? myPred.home_pred : "";
+                        const awayVal = myPred ? myPred.away_pred : "";
 
-                        let pts = 0;
-                        if (pHome === realHome && pAway === realAway) {
-                            pts = 3; 
-                            userScores[pred.user_id].exactMatches++;
-                        } else if ((pHome - pAway) === (realHome - realAway)) {
-                            pts = 2; 
-                        } else if ((pHome > pAway && realHome > realAway) || (pHome < pAway && realHome < realAway)) {
-                            pts = 1; 
+                        let html = `
+                            <div class="match">
+                                <div class="match-header">
+                                    <div class="match-info">
+                                        <span class="status-badge ${isLocked ? 'locked-badge' : ''}">${isLocked ? '🔒 LOCKED' : match.status}</span><br>
+                                        <strong>${match.homeTeam}</strong> vs <strong>${match.awayTeam}</strong><br>
+                                        <small style="color: #666;">${matchDate.toLocaleString()}</small>
+                                    </div>
+                                    <div class="match-inputs">
+                                        <input type="number" id="home-${match.id}" value="${homeVal}" min="0" ${isLocked ? 'disabled' : ''}>
+                                        <span style="font-weight: bold;">-</span>
+                                        <input type="number" id="away-${match.id}" value="${awayVal}" min="0" ${isLocked ? 'disabled' : ''}>
+                                        <button id="btn-save-${match.id}" onclick="window.saveGuess('${match.id}')" ${isLocked ? 'disabled' : ''}>
+                                            ${isLocked ? 'Locked' : (myPred ? 'Update' : 'Save')}
+                                        </button>
+                                        <span id="status-${match.id}" style="font-size: 12px; width: 50px;"></span>
+                                    </div>
+                                </div>
+                        `;
+
+                        // If locked, reveal everyone else's guesses!
+                        if (isLocked) {
+                            const matchPreds = allPreds.filter(p => p.match_id === match.id);
+                            html += `<div class="others-guesses"><strong>Everyone's Guesses:</strong><ul>`;
+                            if(matchPreds.length === 0) {
+                                html += `<li>No one guessed on this game.</li>`;
+                            } else {
+                                matchPreds.forEach(p => {
+                                    const pointString = p.points_awarded !== undefined ? ` <b style="color:green;">(+${p.points_awarded} pts)</b>` : "";
+                                    html += `<li>${p.user_name}: <b>${p.home_pred} - ${p.away_pred}</b>${pointString}</li>`;
+                                });
+                            }
+                            html += `</ul></div>`;
                         }
 
-                        userScores[pred.user_id].points += pts;
-                    }
-                });
+                        html += `</div>`;
+                        container.innerHTML += html;
+                    });
+                }
 
-                // D. Sort and Render
-                // Sort by points, then by number of exact matches as tie-breaker
-                const sortedUsers = Object.values(userScores).sort((a, b) => {
-                    if (b.points === a.points) return b.exactMatches - a.exactMatches;
-                    return b.points - a.points;
-                });
-                
-                tbody.innerHTML = "";
-                if (sortedUsers.length === 0) {
-                    tbody.innerHTML = "<tr><td colspan='2' style='text-align: center;'>No points awarded yet! Make some predictions.</td></tr>";
+                // Render Leaderboard
+                lbBody.innerHTML = "";
+                users.sort((a,b) => b.points - a.points); // Sort by points
+                if(users.length === 0) {
+                    lbBody.innerHTML = "<tr><td colspan='2' style='text-align: center;'>No players yet.</td></tr>";
                 } else {
-                    sortedUsers.forEach((user, index) => {
-                        let medal = "";
-                        if (index === 0) medal = "🥇 ";
-                        else if (index === 1) medal = "🥈 ";
-                        else if (index === 2) medal = "🥉 ";
-                        
-                        tbody.innerHTML += `
+                    users.forEach((u, index) => {
+                        let medal = index === 0 ? "🥇 " : index === 1 ? "🥈 " : index === 2 ? "🥉 " : "";
+                        lbBody.innerHTML += `
                             <tr>
-                                <td>${medal}${user.name} <small style="color:#888; font-size:11px;">(${user.exactMatches} exact)</small></td>
-                                <td><b style="font-size: 1.1em; color: #007aff;">${user.points}</b></td>
+                                <td>${medal}${u.name}</td>
+                                <td><b style="font-size: 1.1em; color: #007aff;">${u.points || 0}</b></td>
                             </tr>
                         `;
                     });
                 }
-            } catch (error) {
-                console.error("Leaderboard Error:", error);
-                tbody.innerHTML = `<tr><td colspan='2' class='error'>Error calculating leaderboard: ${error.message}</td></tr>`;
-            } finally {
-                btn.disabled = false;
+
+            } catch (err) {
+                console.error(err);
+                container.innerHTML = `<p class="error">Error loading dashboard: ${err.message}</p>`;
             }
-        });
+        }
+
+        // Save Guess (Only works if not locked)
+        window.saveGuess = async function(matchId) {
+            const h = document.getElementById(`home-${matchId}`).value;
+            const a = document.getElementById(`away-${matchId}`).value;
+            const statusSpan = document.getElementById(`status-${matchId}`);
+            
+            if (h === "" || a === "") return alert("Enter both scores!");
+            statusSpan.innerText = "Saving...";
+            
+            const predId = `${currentUser.uid}_${matchId}`;
+            try {
+                await setDoc(doc(db, "predictions", predId), {
+                    user_id: currentUser.uid,
+                    user_name: currentUser.displayName,
+                    match_id: matchId,
+                    home_pred: parseInt(h),
+                    away_pred: parseInt(a)
+                }, { merge: true });
+                
+                // Ensure user exists in leaderboard DB
+                await setDoc(doc(db, "users", currentUser.uid), {
+                    name: currentUser.displayName
+                }, { merge: true });
+
+                statusSpan.innerText = "✅ Saved";
+                statusSpan.style.color = "green";
+                setTimeout(() => statusSpan.innerText = "", 3000);
+            } catch (err) {
+                statusSpan.innerText = "❌ Error";
+                alert(err.message);
+            }
+        };
     </script>
 </body>
 </html>

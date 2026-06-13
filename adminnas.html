@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Cup Predictor - Admin</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #343a40; padding: 20px; max-width: 800px; margin: auto; color: #fff; }
+        h1 { text-align: center; color: #f8f9fa; }
+        .card { background: #495057; padding: 20px; margin-bottom: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        
+        input[type="password"] { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #6c757d; border-radius: 6px; box-sizing: border-box; background: #343a40; color: white; }
+        
+        button { background: #ff9800; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: 600; width: 100%; margin-bottom: 10px; transition: background 0.2s; }
+        button:hover { background: #e68a00; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        
+        .btn-google { background: #4285F4; }
+        .btn-google:hover { background: #3367D6; }
+        
+        #admin-status { font-size: 14px; font-weight: bold; margin-top: 15px; padding: 10px; border-radius: 6px; display: none; }
+        .status-success { background: #28a745; color: white; }
+        .status-error { background: #dc3545; color: white; }
+        .status-info { background: #17a2b8; color: white; }
+    </style>
+</head>
+<body>
+
+    <h1>⚙️ Admin Control Panel</h1>
+
+    <!-- Authentication Section -->
+    <div class="card" id="auth-section">
+        <p id="user-info">Please log in to access the admin panel.</p>
+        <button id="login-btn" class="btn-google">Sign in with Google</button>
+        <button id="logout-btn" style="display: none; background: #dc3545;">Log out</button>
+    </div>
+
+    <!-- Admin Panel -->
+    <div class="card" id="admin-section" style="display: none;">
+        <h3 style="margin-top: 0; color: #ff9800;">football-data.org API Key</h3>
+        <input type="password" id="api-key-input" placeholder="Paste your API Token here">
+        
+        <h3 style="color: #ff9800;">Operations</h3>
+        <p style="font-size: 13px; color: #ced4da;">1. Run this before games start to make matches appear for players.</p>
+        <button id="admin-sync-matches">Sync Upcoming Matches to Database</button>
+        
+        <p style="font-size: 13px; color: #ced4da; margin-top: 20px;">2. Run this after games end to pull scores and update the leaderboard.</p>
+        <button id="admin-calc-points">Calculate Points & Update Leaderboard</button>
+        
+        <div id="admin-status"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, collection, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+
+        // --- CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyC9KFqUVsnOjTEX3dqZpgzh85kFALdGRYk",
+            authDomain: "worldcup-210fb.firebaseapp.com",
+            projectId: "worldcup-210fb",
+            storageBucket: "worldcup-210fb.firebasestorage.app",
+            messagingSenderId: "393380182317",
+            appId: "1:393380182317:web:8db9333afe2fe04fd4bba4"
+        };
+        const ADMIN_EMAIL = "nqusai@gmail.com"; 
+        const COMPETITION_CODE = "WC"; 
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const provider = new GoogleAuthProvider();
+
+        let savedApiKey = localStorage.getItem('rapidApiKey') || "";
+        if(savedApiKey) document.getElementById('api-key-input').value = savedApiKey;
+
+        function showStatus(msg, type) {
+            const el = document.getElementById("admin-status");
+            el.innerText = msg;
+            el.className = `status-${type}`;
+            el.style.display = "block";
+        }
+
+        // --- AUTHENTICATION ---
+        document.getElementById("login-btn").addEventListener("click", () => signInWithPopup(auth, provider));
+        document.getElementById("logout-btn").addEventListener("click", () => signOut(auth));
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                document.getElementById("user-info").innerText = `Logged in as: ${user.displayName}`;
+                document.getElementById("login-btn").style.display = "none";
+                document.getElementById("logout-btn").style.display = "block";
+                
+                if (user.email === ADMIN_EMAIL) {
+                    document.getElementById("admin-section").style.display = "block";
+                } else {
+                    document.getElementById("user-info").innerText += " (WARNING: You are not an admin!)";
+                }
+            } else {
+                document.getElementById("user-info").innerText = "Please log in to play.";
+                document.getElementById("login-btn").style.display = "block";
+                document.getElementById("logout-btn").style.display = "none";
+                document.getElementById("admin-section").style.display = "none";
+            }
+        });
+
+        // --- ADMIN FUNCTIONS ---
+        function getApiKey() {
+            const key = document.getElementById('api-key-input').value.trim();
+            if(!key) { alert("Enter API Key first!"); return null; }
+            localStorage.setItem('rapidApiKey', key);
+            return key;
+        }
+
+        document.getElementById("admin-sync-matches").addEventListener("click", async () => {
+            const key = getApiKey(); if(!key) return;
+            showStatus("Fetching matches from football-data.org...", "info");
+
+            try {
+                const proxyUrl = 'https://corsproxy.io/?';
+                const targetUrl = `https://api.football-data.org/v4/competitions/${COMPETITION_CODE}/matches`;
+                
+                const res = await fetch(proxyUrl + encodeURIComponent(targetUrl), { headers: { "X-Auth-Token": key } });
+                const data = await res.json();
+                
+                if(!data.matches) throw new Error("No matches found in API. Is your key valid?");
+                
+                let count = 0;
+                for (let match of data.matches) {
+                    if (match.status !== "FINISHED" && match.status !== "AWARDED") {
+                        await setDoc(doc(db, "matches", match.id.toString()), {
+                            homeTeam: match.homeTeam.name || "TBD",
+                            awayTeam: match.awayTeam.name || "TBD",
+                            utcDate: match.utcDate,
+                            status: match.status
+                        });
+                        count++;
+                    }
+                }
+                showStatus(`✅ Success! Synced ${count} upcoming matches to DB.`, "success");
+            } catch (err) {
+                showStatus(`❌ Error: ${err.message}`, "error");
+            }
+        });
+
+        document.getElementById("admin-calc-points").addEventListener("click", async () => {
+            const key = getApiKey(); if(!key) return;
+            showStatus("Calculating points...", "info");
+
+            try {
+                const proxyUrl = 'https://corsproxy.io/?';
+                const targetUrl = `https://api.football-data.org/v4/competitions/${COMPETITION_CODE}/matches?status=FINISHED`;
+                const res = await fetch(proxyUrl + encodeURIComponent(targetUrl), { headers: { "X-Auth-Token": key } });
+                const data = await res.json();
+                const finishedMatches = data.matches || [];
+
+                const predsSnap = await getDocs(collection(db, "predictions"));
+                let userPoints = {}; 
+
+                for (let predDoc of predsSnap.docs) {
+                    const pred = predDoc.data();
+                    if(!userPoints[pred.user_id]) {
+                        userPoints[pred.user_id] = { name: pred.user_name, total: 0 };
+                    }
+
+                    const actualMatch = finishedMatches.find(m => m.id.toString() === pred.match_id.toString());
+                    if (actualMatch && actualMatch.score && actualMatch.score.fullTime && actualMatch.score.fullTime.home !== null) {
+                        const rHome = actualMatch.score.fullTime.home;
+                        const rAway = actualMatch.score.fullTime.away;
+                        const pHome = pred.home_pred;
+                        const pAway = pred.away_pred;
+
+                        let pts = 0;
+                        if (pHome === rHome && pAway === rAway) pts = 3; 
+                        else if ((pHome - pAway) === (rHome - rAway)) pts = 2; 
+                        else if ((pHome > pAway && rHome > rAway) || (pHome < pAway && rHome < rAway)) pts = 1; 
+
+                        userPoints[pred.user_id].total += pts;
+                        await updateDoc(doc(db, "predictions", predDoc.id), { points_awarded: pts });
+                    }
+                }
+
+                for (const [uid, uData] of Object.entries(userPoints)) {
+                    await setDoc(doc(db, "users", uid), { name: uData.name, points: uData.total }, { merge: true });
+                }
+
+                showStatus(`✅ Leaderboard successfully updated in DB!`, "success");
+            } catch (err) {
+                showStatus(`❌ Error: ${err.message}`, "error");
+            }
+        });
+    </script>
+</body>
+</html>
