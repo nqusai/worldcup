@@ -171,22 +171,25 @@
                 const lbBody = document.getElementById("leaderboard-body");
                 
                 try {
-                    // 1. Fetch Matches from Firebase (Admin puts them here)
-                    const matchesSnap = await getDocs(collection(db, "matches"));
-                    let matches = [];
-                    matchesSnap.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
-                    
-                    // 2. Fetch all predictions from Firebase
-                    const predsSnap = await getDocs(collection(db, "predictions"));
-                    let allPreds = [];
-                    predsSnap.forEach(doc => allPreds.push(doc.data()));
+                    // 1. Fetch Matches from Firebase
+                const matchesSnap = await getDocs(collection(db, "matches"));
+                let matches = [];
+                matchesSnap.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
+                
+                // 2. Fetch all predictions from Firebase
+                const predsSnap = await getDocs(collection(db, "predictions"));
+                let allPreds = [];
+                predsSnap.forEach(doc => allPreds.push(doc.data()));
 
-                    // 3. Fetch Leaderboard (Users collection)
-                    const usersSnap = await getDocs(collection(db, "users"));
-                    let users = [];
-                    usersSnap.forEach(doc => users.push(doc.data()));
+                // 3. Fetch Leaderboard (Users collection)
+                const usersSnap = await getDocs(collection(db, "users"));
+                let users = [];
+                usersSnap.forEach(doc => users.push(doc.data()));
 
-                    // Time definitions
+                // OPTIMIZATION: Stop pulling the API from the frontend. The GitHub Action handles this.
+                // We rely completely on the points_awarded field calculated by the backend.
+
+                // Time definitions
                     const now = new Date().getTime();
                     const next24 = now + (24 * 60 * 60 * 1000);
 
@@ -245,13 +248,8 @@
                                     const isMe = p.user_id === currentUser.uid;
                                     const nameDisplay = isMe ? `<b>${p.user_name} (You)</b>` : p.user_name;
                                     
-                                    // Make sure we show 0 points instead of blank if calculated, and nothing if not calculated
-                                    let pointString = "";
-                                    if (p.points_awarded !== undefined) {
-                                        pointString = p.points_awarded > 0 ? ` <b style="color:green;">(+${p.points_awarded} pts)</b>` : ` <span style="color:#888;">(+0 pts)</span>`;
-                                    }
-                                    
-                                    html += `<li>${nameDisplay}: <b>${p.home_pred} - ${p.away_pred}</b>${pointString}</li>`;
+                                    // Because this is an upcoming match, don't show points (they will be 0 from backend)
+                                    html += `<li>${nameDisplay}: <b>${p.home_pred} - ${p.away_pred}</b></li>`;
                                 });
                             }
                             html += `</ul></div></div>`;
