@@ -1,0 +1,27 @@
+name: Auto-Sync World Cup Data
+
+on:
+  schedule:
+    - cron: '0 */2 * * *' 
+  workflow_dispatch: 
+
+jobs:
+  update-firebase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Install Dependencies
+        run: pip install requests firebase-admin
+        
+      - name: Run Automation Script
+        env:
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+          FOOTBALL_API_KEY: ${{ secrets.FOOTBALL_API_KEY }}
+        run: python auto_sync.py
