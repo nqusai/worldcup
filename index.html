@@ -43,36 +43,27 @@
     <div id="app-root">
         <h1>🏆 iPredictor</h1>
 
-        <!-- Player Account Section -->
-        <div class="card" id="auth-section">
-            <h3 style="margin-top: 0;">Player Account</h3>
-            <p id="user-info">Please log in to play.</p>
-            <button id="login-btn" style="display: inline-block;">Sign in with Google</button>
-            <button id="logout-btn" style="display: none; background: #dc3545;">Log out</button>
+        <!-- Initial Login View (Visible when not logged in) -->
+        <div class="card" id="initial-login-section" style="text-align: center; padding: 40px 20px;">
+            <h2 style="margin-top: 0; color: #2c3e50;">Welcome to iPredictor</h2>
+            <p style="color: #666; margin-bottom: 25px;">Please log in with your Google account to start making predictions.</p>
+            <button id="initial-login-btn" style="font-size: 16px; padding: 12px 30px;">Sign in with Google</button>
         </div>
 
-        <!-- Upcoming Matches Section -->
-        <div class="card" id="predictions-section" style="display: none;">
+        <!-- The Main App Content (Hidden until logged in) -->
+        <div id="main-app-content" style="display: none;">
+            
+            <!-- Upcoming Matches Section (1) -->
+            <div class="card" id="predictions-section">
             <h2 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
                 Matches (Next 24 Hours)
                 <button onclick="window.location.reload()" style="font-size: 12px; padding: 8px 15px;">Refresh</button>
             </h2>
             <p style="font-size: 13px; color: #666;">Predictions lock exactly 1 hour before kickoff.</p>
-            <div id="matches-container"></div>
+            <div id="matches-container">Loading games...</div>
         </div>
 
-        <!-- History Section -->
-        <div class="card" id="history-section" style="display: none;">
-            <details>
-                <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; outline: none; margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
-                    <span>📜 Match History</span>
-                    <span style="font-size: 0.5em; font-weight: normal; color: #666;">(Click to expand)</span>
-                </summary>
-                <div id="history-container" style="margin-top: 15px;">Loading history...</div>
-            </details>
-        </div>
-
-        <!-- Leaderboard Section -->
+        <!-- Leaderboard Section (2) -->
         <div class="card" id="leaderboard-section">
             <h2 style="margin-top: 0;">Live Leaderboard</h2>
             <table>
@@ -83,7 +74,18 @@
             </table>
         </div>
 
-        <!-- Game Rules Section -->
+        <!-- History Section (3) -->
+        <div class="card" id="history-section" style="display: none;">
+            <details>
+                <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; outline: none; margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
+                    <span>📜 Match History</span>
+                    <span style="font-size: 0.5em; font-weight: normal; color: #666;">(Click to expand)</span>
+                </summary>
+                <div id="history-container" style="margin-top: 15px;">Loading history...</div>
+            </details>
+        </div>
+
+        <!-- Game Rules Section (4) -->
         <div class="card" id="rules-section">
             <details>
                 <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; outline: none; margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
@@ -111,8 +113,17 @@
             </details>
         </div>
 
+        <!-- Player Account Section (Now the last card) -->
+            <div class="card" id="auth-section">
+                <h3 style="margin-top: 0;">Player Account</h3>
+                <p id="user-info">Logged in.</p>
+                <button id="logout-btn" style="background: #dc3545;">Log out</button>
+            </div>
+            
+        </div> <!-- End of main-app-content -->
+
         <footer style="text-align: center; font-size: 12px; color: #aaa; margin-top: 40px; padding-bottom: 20px;">
-            <span id="version-number">v05 (Final Version)</span>
+            <span id="version-number">v07 (Clean Login UI)</span>
         </footer>
 
         <!-- Application Logic -->
@@ -140,26 +151,27 @@
             let currentUser = null;
 
             // --- AUTHENTICATION ---
-            document.getElementById("login-btn").addEventListener("click", () => signInWithPopup(auth, provider));
+            document.getElementById("initial-login-btn").addEventListener("click", () => signInWithPopup(auth, provider));
             document.getElementById("logout-btn").addEventListener("click", () => signOut(auth));
 
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     currentUser = user;
+                    
+                    // Hide initial login, show main app
+                    document.getElementById("initial-login-section").style.display = "none";
+                    document.getElementById("main-app-content").style.display = "block";
+                    
                     document.getElementById("user-info").innerText = `Logged in as: ${user.displayName}`;
-                    document.getElementById("login-btn").style.display = "none";
-                    document.getElementById("logout-btn").style.display = "inline-block";
-                    document.getElementById("predictions-section").style.display = "block";
-                    document.getElementById("history-section").style.display = "block";
                     
                     loadPlayerDashboard();
                 } else {
                     currentUser = null;
-                    document.getElementById("user-info").innerText = "Please log in to play.";
-                    document.getElementById("login-btn").style.display = "inline-block";
-                    document.getElementById("logout-btn").style.display = "none";
-                    document.getElementById("predictions-section").style.display = "none";
-                    document.getElementById("history-section").style.display = "none";
+                    
+                    // Show initial login, hide main app
+                    document.getElementById("initial-login-section").style.display = "block";
+                    document.getElementById("main-app-content").style.display = "none";
+                    
                     document.getElementById("matches-container").innerHTML = "";
                 }
             });
