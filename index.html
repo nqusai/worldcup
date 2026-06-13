@@ -39,8 +39,8 @@
     <!-- API Config Section (For testing without hardcoding keys) -->
     <div class="card" id="config-section">
         <h3 style="margin-top: 0;">API Configuration</h3>
-        <p style="font-size: 14px; color: #666;">Enter your direct API-Football Key to load matches.</p>
-        <input type="password" id="api-key-input" placeholder="Enter API Key" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+        <p style="font-size: 14px; color: #666;">Enter your football-data.org API Token to load matches.</p>
+        <input type="password" id="api-key-input" placeholder="Enter API Token" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
         <button id="save-key-btn">Save Key</button>
         <span id="key-status" style="margin-left: 10px; font-size: 14px;"></span>
     </div>
@@ -86,8 +86,7 @@
         };
 
         // 3. Football API Settings
-        const LEAGUE_ID = "1";    // 1 = World Cup
-        const SEASON = "2026";    // Next World Cup season
+        const COMPETITION_CODE = "WC"; // World Cup code in football-data.org
 
         // 4. Initialize Firebase
         const app = initializeApp(firebaseConfig);
@@ -174,21 +173,16 @@
             btn.disabled = true;
 
             try {
-                // Fetch matches
-                const response = await fetch(`https://v3.football.api-sports.io/fixtures?league=${LEAGUE_ID}&season=${SEASON}&status=NS`, {
-                    headers: { "x-apisports-key": rapidApiKey }
+                // Fetch matches from football-data.org
+                const response = await fetch(`https://api.football-data.org/v4/competitions/${COMPETITION_CODE}/matches?status=SCHEDULED`, {
+                    headers: { "X-Auth-Token": rapidApiKey }
                 });
                 
                 if (!response.ok) throw new Error(`API Error: ${response.status}`);
-                
                 const data = await response.json();
                 
-                if (data.errors && Object.keys(data.errors).length > 0) {
-                     throw new Error(Object.values(data.errors)[0]);
-                }
-                
-                if (!data.response || data.response.length === 0) {
-                    container.innerHTML = "<p>No upcoming matches found for the 2026 World Cup at this moment.</p>";
+                if (!data.matches || data.matches.length === 0) {
+                    container.innerHTML = "<p>No upcoming matches found for the World Cup at this moment.</p>";
                     btn.disabled = false;
                     return;
                 }
@@ -209,16 +203,17 @@
                     }
                 }
 
-                const matches = data.response;
+                const matches = data.matches;
                 container.innerHTML = ""; 
 
                 matches.slice(0, 15).forEach(match => {
-                    const m = match.fixture;
-                    const teams = match.teams;
-                    const matchDate = new Date(m.date);
+                    const mId = match.id;
+                    const homeTeam = match.homeTeam.name || "TBD";
+                    const awayTeam = match.awayTeam.name || "TBD";
+                    const matchDate = new Date(match.utcDate);
                     
                     // Check if user already predicted
-                    const existingPred = userPredictions[m.id];
+                    const existingPred = userPredictions[mId];
                     const homeVal = existingPred ? existingPred.home_pred : "";
                     const awayVal = existingPred ? existingPred.away_pred : "";
                     const btnText = existingPred ? "Update" : "Save";
@@ -227,22 +222,22 @@
                     matchDiv.className = "match";
                     matchDiv.innerHTML = `
                         <div class="match-info">
-                            <span class="status-badge">${m.status.short}</span><br>
-                            <strong>${teams.home.name}</strong> vs <strong>${teams.away.name}</strong><br>
+                            <span class="status-badge">${match.status}</span><br>
+                            <strong>${homeTeam}</strong> vs <strong>${awayTeam}</strong><br>
                             <small style="color: #666;">${matchDate.toLocaleString()}</small>
                         </div>
                         <div class="match-inputs">
                             <div style="display: flex; flex-direction: column; align-items: center;">
-                                <small>${teams.home.name}</small>
-                                <input type="number" id="home-${m.id}" value="${homeVal}" min="0">
+                                <small>${homeTeam.substring(0,3).toUpperCase()}</small>
+                                <input type="number" id="home-${mId}" value="${homeVal}" min="0">
                             </div>
                             <span style="font-weight: bold;">-</span>
                             <div style="display: flex; flex-direction: column; align-items: center;">
-                                <small>${teams.away.name}</small>
-                                <input type="number" id="away-${m.id}" value="${awayVal}" min="0">
+                                <small>${awayTeam.substring(0,3).toUpperCase()}</small>
+                                <input type="number" id="away-${mId}" value="${awayVal}" min="0">
                             </div>
-                            <button id="btn-save-${m.id}" onclick="window.saveGuess(${m.id})">${btnText}</button>
-                            <span id="status-${m.id}" style="font-size: 12px; margin-left: 5px; width: 60px;"></span>
+                            <button id="btn-save-${mId}" onclick="window.saveGuess(${mId})">${btnText}</button>
+                            <span id="status-${mId}" style="font-size: 12px; margin-left: 5px; width: 60px;"></span>
                         </div>
                     `;
                     container.appendChild(matchDiv);
@@ -320,14 +315,14 @@
 
             try {
                 // A. Get finished matches
-                const apiRes = await fetch(`https://v3.football.api-sports.io/fixtures?league=${LEAGUE_ID}&season=${SEASON}&status=FT`, {
-                    headers: { "x-apisports-key": rapidApiKey }
+                const apiRes = await fetch(`https://api.football-data.org/v4/competitions/${COMPETITION_CODE}/matches?status=FINISHED`, {
+                    headers: { "X-Auth-Token": rapidApiKey }
                 });
                 
                 if (!apiRes.ok) throw new Error(`API Error: ${apiRes.status}`);
                 
                 const apiData = await apiRes.json();
-                const finishedMatches = apiData.response || [];
+                const finishedMatches = apiData.matches || [];
 
                 // B. Get all predictions from Firebase
                 const querySnapshot = await getDocs(collection(db, "predictions"));
@@ -342,11 +337,11 @@
                         userScores[pred.user_id] = { name: pred.user_name, points: 0, exactMatches: 0 };
                     }
 
-                    const actualMatch = finishedMatches.find(m => m.fixture.id === pred.match_id);
+                    const actualMatch = finishedMatches.find(m => m.id === pred.match_id);
                     
-                    if (actualMatch) {
-                        const realHome = actualMatch.goals.home;
-                        const realAway = actualMatch.goals.away;
+                    if (actualMatch && actualMatch.score && actualMatch.score.fullTime) {
+                        const realHome = actualMatch.score.fullTime.home;
+                        const realAway = actualMatch.score.fullTime.away;
                         const pHome = pred.home_pred;
                         const pAway = pred.away_pred;
 
