@@ -1,9 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>World Cup Predictor</title>
+    <title>iPredictor</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f9; padding: 20px; max-width: 800px; margin: auto; color: #333; }
         h1 { text-align: center; color: #2c3e50; }
@@ -48,7 +47,7 @@
         <div class="card" id="auth-section">
             <h3 style="margin-top: 0;">Player Account</h3>
             <p id="user-info">Please log in to play.</p>
-            <button id="login-btn">Sign in with Google</button>
+            <button id="login-btn" style="display: inline-block;">Sign in with Google</button>
             <button id="logout-btn" style="display: none; background: #dc3545;">Log out</button>
         </div>
 
@@ -59,7 +58,7 @@
                 <button onclick="window.location.reload()" style="font-size: 12px; padding: 8px 15px;">Refresh</button>
             </h2>
             <p style="font-size: 13px; color: #666;">Predictions lock exactly 1 hour before kickoff.</p>
-            <div id="matches-container">Loading games...</div>
+            <div id="matches-container"></div>
         </div>
 
         <!-- History Section -->
@@ -82,6 +81,34 @@
                     <tr><td colspan="2" style="text-align: center; color: #666;">Waiting for data...</td></tr>
                 </tbody>
             </table>
+        </div>
+
+        <!-- Game Rules Section -->
+        <div class="card" id="rules-section">
+            <details>
+                <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; outline: none; margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
+                    <span>📖 Game Rules</span>
+                    <span style="font-size: 0.5em; font-weight: normal; color: #666;">(Click to expand)</span>
+                </summary>
+                <div style="margin-top: 15px; font-size: 14px; line-height: 1.5; color: #444;">
+                    <p>Guess the final score of every match. The closer you are, the more points you get.</p>
+                    
+                    <h4 style="margin-bottom: 5px; color: #2c3e50;">🔢 Scoring (3-2-1)</h4>
+                    <ul style="margin-top: 0; padding-left: 20px;">
+                        <li>🎯 <b>3 Points:</b> Exact final score <i>(e.g. guessed 2-1, finished 2-1)</i></li>
+                        <li>⚖️ <b>2 Points:</b> Correct winner + correct goal difference <i>(e.g. guessed 3-1, finished 2-0)</i></li>
+                        <li>✅ <b>1 Point:</b> Correct winner, wrong score <i>(e.g. guessed 1-0, finished 4-0)</i></li>
+                        <li>❌ <b>0 Points:</b> Wrong outcome</li>
+                    </ul>
+
+                    <h4 style="margin-bottom: 5px; color: #2c3e50;">⏰ How to Play</h4>
+                    <ul style="margin-top: 0; padding-left: 20px;">
+                        <li>🔒 Predictions <b>lock 1 hour before kickoff</b>.</li>
+                        <li>👀 Open cards! You can see everyone else's guesses under each match.</li>
+                        <li>⏳ The app only shows matches happening in the <b>next 24 hours</b>.</li>
+                    </ul>
+                </div>
+            </details>
         </div>
 
         <footer style="text-align: center; font-size: 12px; color: #aaa; margin-top: 40px; padding-bottom: 20px;">
@@ -343,5 +370,5 @@
             };
         </script>
     </div>
-</body>
-</html>
+
+</body></html>
