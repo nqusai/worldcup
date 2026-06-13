@@ -86,8 +86,8 @@
         };
 
         // 3. Football API Settings
-        const LEAGUE_ID = "39";   // 39 = Premier League (for testing)
-        const SEASON = "2023";    // Current season
+        const LEAGUE_ID = "1";    // 1 = World Cup
+        const SEASON = "2026";    // Next World Cup season
 
         // 4. Initialize Firebase
         const app = initializeApp(firebaseConfig);
@@ -188,7 +188,7 @@
                 }
                 
                 if (!data.response || data.response.length === 0) {
-                    container.innerHTML = "<p>No upcoming matches found for this league/season.</p>";
+                    container.innerHTML = "<p>No upcoming matches found for the 2026 World Cup at this moment.</p>";
                     btn.disabled = false;
                     return;
                 }
@@ -212,7 +212,7 @@
                 const matches = data.response;
                 container.innerHTML = ""; 
 
-                matches.forEach(match => {
+                matches.slice(0, 15).forEach(match => {
                     const m = match.fixture;
                     const teams = match.teams;
                     const matchDate = new Date(m.date);
