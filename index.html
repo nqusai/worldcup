@@ -55,7 +55,7 @@
         <div class="card" id="predictions-section" style="display: none;">
             <h2 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
                 Matches (Next 24 Hours)
-                <button onclick="window.location.reload()" style="font-size: 12px; padding: 8px 15px;">Refresh</button>
+                <button onclick="window.forceRefresh()" style="font-size: 12px; padding: 8px 15px;">Refresh</button>
             </h2>
             <p style="font-size: 13px; color: #666;">Predictions lock exactly 1 hour before kickoff.</p>
             <div id="matches-container"></div>
@@ -411,10 +411,16 @@
                     loadPlayerDashboard();
                     
                     setTimeout(() => statusSpan.innerText = "", 3000);
+                }
                 } catch (err) {
                     statusSpan.innerText = "❌ Error";
                     alert(err.message);
                 }
+            };
+
+            // Support the refresh button
+            window.forceRefresh = function() {
+                loadPlayerDashboard();
             };
         </script>
     </div>
