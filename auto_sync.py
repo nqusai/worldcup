@@ -3,6 +3,7 @@ import json
 import requests
 import firebase_admin
 from firebase_admin import credentials, firestore
+from datetime import datetime, timezone
 
 # --- CONFIGURATION ---
 COMPETITION_CODE = "WC" # World Cup code
@@ -33,14 +34,21 @@ print("🤖 Starting Automatic Sync...")
 print("Fetching all games...")
 resp = requests.get(base_url, headers=headers).json()
 
+current_time = datetime.now(timezone.utc)
+
 if 'matches' in resp:
     count = 0
     for match in resp['matches']:
+        match_date = datetime.strptime(match['utcDate'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        ms_until_kickoff = (match_date - current_time).total_seconds() * 1000
+        is_locked = ms_until_kickoff <= 3600000 # 1 hour
+        
         match_data = {
             "homeTeam": match['homeTeam'].get('name', 'TBD'),
             "awayTeam": match['awayTeam'].get('name', 'TBD'),
             "utcDate": match['utcDate'],
-            "status": match['status']
+            "status": match['status'],
+            "is_locked": is_locked
         }
         
         # Save actual scores if they exist
@@ -52,6 +60,25 @@ if 'matches' in resp:
     print(f"✅ Synced {count} matches to Firebase.")
 else:
     print("⚠️ No matches found in API response.")
+
+# ==========================================
+# STEP 1.5: LOCK PREDICTIONS (1 Hour Before)
+# ==========================================
+print("Locking predictions for games starting soon...")
+preds_ref = db.collection('predictions').stream()
+all_preds = {p.id: p.to_dict() for p in preds_ref}
+
+for match in resp.get('matches', []):
+    match_date = datetime.strptime(match['utcDate'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    ms_until_kickoff = (match_date - current_time).total_seconds() * 1000
+    
+    if ms_until_kickoff <= 3600000: # 1 hour
+        match_id = str(match['id'])
+        # Find all unlocked predictions for this match
+        for p_id, p_data in all_preds.items():
+            if str(p_data.get('match_id')) == match_id and not p_data.get('is_locked', False):
+                db.collection('predictions').document(p_id).update({"is_locked": True})
+                print(f"🔒 Locked prediction {p_id}")
 
 # ==========================================
 # STEP 2: CALCULATE POINTS FOR FINISHED GAMES

@@ -119,7 +119,7 @@
         <script type="module">
             import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
             import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
-            import { getFirestore, doc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+            import { getFirestore, doc, setDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
             // --- CONFIGURATION ---
             const firebaseConfig = {
@@ -138,6 +138,14 @@
             const provider = new GoogleAuthProvider();
 
             let currentUser = null;
+
+            // --- XSS SANITIZER ---
+            function escapeHTML(str) {
+                if (!str) return "";
+                return str.replace(/[&<>'"]/g, tag => ({
+                    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+                }[tag] || tag));
+            }
 
             // --- AUTHENTICATION ---
             document.getElementById("login-btn").addEventListener("click", () => signInWithPopup(auth, provider));
@@ -176,10 +184,16 @@
                 let matches = [];
                 matchesSnap.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
                 
-                // 2. Fetch all predictions from Firebase
-                const predsSnap = await getDocs(collection(db, "predictions"));
-                let allPreds = [];
-                predsSnap.forEach(doc => allPreds.push(doc.data()));
+                // 2. Fetch predictions (Only ours, and ones that are locked!)
+                const qMy = query(collection(db, "predictions"), where("user_id", "==", currentUser.uid));
+                const qLocked = query(collection(db, "predictions"), where("is_locked", "==", true));
+                
+                const [mySnap, lockedSnap] = await Promise.all([getDocs(qMy), getDocs(qLocked)]);
+                
+                let predsMap = {};
+                mySnap.forEach(doc => predsMap[doc.id] = doc.data());
+                lockedSnap.forEach(doc => predsMap[doc.id] = doc.data());
+                let allPreds = Object.values(predsMap);
 
                 // 3. Fetch Leaderboard (Users collection)
                 const usersSnap = await getDocs(collection(db, "users"));
@@ -384,7 +398,8 @@
                         user_name: currentUser.displayName,
                         match_id: matchId,
                         home_pred: parseInt(h),
-                        away_pred: parseInt(a)
+                        away_pred: parseInt(a),
+                        is_locked: false // ALL new predictions start unlocked
                     }, { merge: true });
                     
                     // Ensure user exists in leaderboard DB
