@@ -119,7 +119,7 @@
         <script type="module">
             import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
             import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
-            import { getFirestore, doc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+            import { getFirestore, doc, setDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
             // --- CONFIGURATION ---
             const firebaseConfig = {
@@ -138,6 +138,14 @@
             const provider = new GoogleAuthProvider();
 
             let currentUser = null;
+
+            // --- XSS SANITIZER ---
+            function escapeHTML(str) {
+                if (!str) return "";
+                return str.replace(/[&<>'"]/g, tag => ({
+                    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+                }[tag] || tag));
+            }
 
             // --- AUTHENTICATION ---
             document.getElementById("login-btn").addEventListener("click", () => signInWithPopup(auth, provider));
@@ -278,9 +286,12 @@
                             } else {
                                 matchPreds.forEach(p => {
                                     const isMe = p.user_id === currentUser.uid;
-                                    const nameDisplay = isMe ? `<b>${p.user_name} (You)</b>` : p.user_name;
+                                    const safeName = escapeHTML(p.user_name);
+                                    const nameDisplay = isMe ? `<b>${safeName} (You)</b>` : safeName;
                                     
                                     let predDisplay = "";
+                                    
+                                    // Double verification: The match must be within 1 hour OR it must be your own guess
                                     if (isLocked || isMe) {
                                         predDisplay = `<b>${p.home_pred} - ${p.away_pred}</b>`;
                                     } else {
@@ -384,7 +395,8 @@
                         user_name: currentUser.displayName,
                         match_id: matchId,
                         home_pred: parseInt(h),
-                        away_pred: parseInt(a)
+                        away_pred: parseInt(a),
+                        is_locked: false // ALL new predictions start unlocked
                     }, { merge: true });
                     
                     // Ensure user exists in leaderboard DB
