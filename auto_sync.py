@@ -82,6 +82,12 @@ for doc in preds_ref:
         p_away = pred.get('away_pred')
         
         if p_home is not None and p_away is not None:
+            # Convert to integers just in case they are stored as strings in Firebase
+            p_home = int(p_home)
+            p_away = int(p_away)
+            r_home = int(r_home)
+            r_away = int(r_away)
+            
             pts = 0
             if p_home == r_home and p_away == r_away:
                 pts = 3 # Exact
