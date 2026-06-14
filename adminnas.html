@@ -78,7 +78,7 @@
         const db = getFirestore(app);
         const provider = new GoogleAuthProvider();
 
-        let savedApiKey = localStorage.getItem('rapidApiKey') || "";
+        let savedApiKey = localStorage.getItem('rapidApiKey') || "0e2f8673be454cf3872dd391b1863fd1";
         if(savedApiKey) document.getElementById('api-key-input').value = savedApiKey;
 
         let savedGhToken = localStorage.getItem('githubToken') || "";

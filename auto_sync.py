@@ -65,32 +65,35 @@ user_points = {}
 
 for doc in preds_ref:
     pred = doc.to_dict()
-    uid = pred['user_id']
+    uid = pred.get('user_id')
+    if not uid:
+        continue
     
     if uid not in user_points:
         user_points[uid] = {"name": pred.get('user_name', 'Unknown Player'), "total": 0}
         
     # Find if this specific prediction's match has finished
-    actual_match = next((m for m in finished_matches if str(m['id']) == str(pred['match_id'])), None)
+    actual_match = next((m for m in finished_matches if str(m['id']) == str(pred.get('match_id'))), None)
     
-    if actual_match and 'score' in actual_match and actual_match['score']['fullTime']['home'] is not None:
+    if actual_match and 'score' in actual_match and actual_match['score'].get('fullTime') and actual_match['score']['fullTime'].get('home') is not None:
         r_home = actual_match['score']['fullTime']['home']
         r_away = actual_match['score']['fullTime']['away']
-        p_home = pred['home_pred']
-        p_away = pred['away_pred']
+        p_home = pred.get('home_pred')
+        p_away = pred.get('away_pred')
         
-        pts = 0
-        if p_home == r_home and p_away == r_away:
-            pts = 3 # Exact
-        elif (p_home - p_away) == (r_home - r_away):
-            pts = 2 # Margin / Draw
-        elif (p_home > p_away and r_home > r_away) or (p_home < p_away and r_home < r_away):
-            pts = 1 # Outcome
+        if p_home is not None and p_away is not None:
+            pts = 0
+            if p_home == r_home and p_away == r_away:
+                pts = 3 # Exact
+            elif (p_home - p_away) == (r_home - r_away):
+                pts = 2 # Margin / Draw
+            elif (p_home > p_away and r_home > r_away) or (p_home < p_away and r_home < r_away):
+                pts = 1 # Outcome
+                
+            user_points[uid]['total'] += pts
             
-        user_points[uid]['total'] += pts
-        
-        # Save awarded points to the prediction document
-        db.collection('predictions').document(doc.id).update({"points_awarded": pts})
+            # Save awarded points to the prediction document
+            db.collection('predictions').document(doc.id).update({"points_awarded": pts})
 
 # Update Users Leaderboard Collection
 for uid, data in user_points.items():
