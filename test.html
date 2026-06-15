@@ -330,7 +330,7 @@
                                 } else {
                                     // Match is open! We can infer if they submitted by checking if a record exists
                                     // (Since your save function creates a user doc, we check status changes cleanly)
-                                    statusDisplay = loadedPred ? `<b style="color:green;">Submitted ⏳</b>` : `<i style="color:#aaa;">Waiting...</i>`;
+                                    statusDisplay = loadedPred ? `<b style="color:green;">Submitted ⏳</b>` : `<i style="color:#aaa;">Hidden</i>`;
                                 }
                                 
                                 html += `<li>${nameDisplay}: ${statusDisplay}</li>`;
