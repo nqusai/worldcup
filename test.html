@@ -54,8 +54,8 @@
         <!-- Upcoming Matches Section -->
         <div class="card" id="predictions-section" style="display: none;">
             <h2 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
-                Matches (Next 24 Hours)
-                <button onclick="window.location.reload()" style="font-size: 12px; padding: 8px 15px;">Refresh</button>
+                Matches (Next 48 Hours)
+                <button onclick="window.forceRefresh()" style="font-size: 12px; padding: 8px 15px;">Refresh</button>
             </h2>
             <p style="font-size: 13px; color: #666;">Predictions lock exactly 1 hour before kickoff.</p>
             <div id="matches-container"></div>
@@ -231,21 +231,21 @@
 
                 // Time definitions
                     const now = new Date().getTime();
-                    const next24 = now + (24 * 60 * 60 * 1000);
+                    const next48 = now + (48 * 60 * 60 * 1000);
 
                     // Split Matches into Upcoming and History
                     const historyMatches = matches.filter(m => m.status === 'FINISHED' || m.status === 'AWARDED');
                     const upcomingMatches = matches.filter(m => 
                         m.status !== 'FINISHED' && m.status !== 'AWARDED' && 
-                        new Date(m.utcDate).getTime() <= next24
+                        new Date(m.utcDate).getTime() <= next48
                     );
 
                     // ==========================================
-                    // RENDER UPCOMING MATCHES (Next 24 Hours)
+                    // RENDER UPCOMING MATCHES (Next 48 Hours)
                     // ==========================================
                     container.innerHTML = "";
                     if(upcomingMatches.length === 0) {
-                        container.innerHTML = "<p>No matches scheduled in the next 24 hours.</p>";
+                        container.innerHTML = "<p>No matches scheduled in the next 48 hours.</p>";
                     } else {
                         upcomingMatches.sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
                         
