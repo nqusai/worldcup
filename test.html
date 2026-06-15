@@ -179,21 +179,58 @@
                 const lbBody = document.getElementById("leaderboard-body");
                 
                 try {
-                    // 1. Fetch Matches from Firebase
+
+                // 1. Fetch Matches from Firebase (Safe: visible to all authenticated users)
                 const matchesSnap = await getDocs(collection(db, "matches"));
                 let matches = [];
                 matchesSnap.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
-                
-                // 2. Fetch all predictions from Firebase
-                const predsSnap = await getDocs(collection(db, "predictions"));
+
+                // Define time boundaries based on current system time
+                const now = new Date().getTime();
+                const next48 = now + (48 * 60 * 60 * 1000);
+
+                // Identify which matches are officially finished or locked (less than 1 hour to kickoff)
+                const lockedMatchIds = matches
+                .filter(m => m.status === 'FINISHED' || m.status === 'AWARDED' || (new Date(m.utcDate).getTime() - now) <= 3600000)
+                .map(m => m.id.toString());
+
                 let allPreds = [];
-                predsSnap.forEach(doc => allPreds.push(doc.data()));
 
-                // 3. Fetch Leaderboard (Users collection)
-                const usersSnap = await getDocs(collection(db, "users"));
-                let users = [];
-                usersSnap.forEach(doc => users.push(doc.data()));
+            // 2a. Fetch ONLY the logged-in user's predictions (Forces security rule alignment)
+            const myPredsQuery = query(collection(db, "predictions"), where("user_id", "==", currentUser.uid));
+            const myPredsSnap = await getDocs(myPredsQuery);
+            myPredsSnap.forEach(doc => allPreds.push(doc.data()));
 
+            // 2b. Fetch everyone else's predictions ONLY for locked/historical matches
+            if (lockedMatchIds.length > 0) {
+            // Firestore 'in' queries support up to 30 items per batch
+            const batchSize = 30;
+            for (let i = 0; i < lockedMatchIds.length; i += batchSize) {
+                const batchIds = lockedMatchIds.slice(i, i + batchSize);
+                const lockedPredsQuery = query(collection(db, "predictions"), where("match_id", "in", batchIds));
+                const lockedPredsSnap = await getDocs(lockedPredsQuery);
+        
+                lockedPredsSnap.forEach(doc => {
+                    const data = doc.data();
+                    // Avoid adding duplicates of the current user's predictions
+                       if (data.user_id !== currentUser.uid) {
+                   allPreds.push(data);
+                    }
+                });
+            }
+        }
+
+// 3. Fetch Leaderboard baseline (Users collection)
+const usersSnap = await getDocs(collection(db, "users"));
+let users = [];
+usersSnap.forEach(doc => users.push(doc.data()));
+
+
+
+                    
+
+
+                    
                 // Calculate Points dynamically from Firebase data
                 let userScoresMap = {};
                 allPreds.forEach(pred => {
