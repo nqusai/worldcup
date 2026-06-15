@@ -43,7 +43,6 @@
     <div id="app-root">
         <h1>🏆 iPredictor</h1>
 
-        <!-- Player Account Section -->
         <div class="card" id="auth-section">
             <h3 style="margin-top: 0;">Player Account</h3>
             <p id="user-info">Please log in to play.</p>
@@ -51,7 +50,6 @@
             <button id="logout-btn" style="display: none; background: #dc3545;">Log out</button>
         </div>
 
-        <!-- Upcoming Matches Section -->
         <div class="card" id="predictions-section" style="display: none;">
             <h2 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
                 Matches (Next 48 Hours)
@@ -61,7 +59,6 @@
             <div id="matches-container"></div>
         </div>
 
-        <!-- History Section -->
         <div class="card" id="history-section" style="display: none;">
             <details>
                 <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; outline: none; margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
@@ -72,7 +69,6 @@
             </details>
         </div>
 
-        <!-- Leaderboard Section -->
         <div class="card" id="leaderboard-section">
             <h2 style="margin-top: 0;">Live Leaderboard</h2>
             <table>
@@ -83,7 +79,6 @@
             </table>
         </div>
 
-        <!-- Game Rules Section -->
         <div class="card" id="rules-section">
             <details>
                 <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; outline: none; margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
@@ -115,7 +110,6 @@
             <span id="version-number">v05 (Final Version)</span>
         </footer>
 
-        <!-- Application Logic -->
         <script type="module">
             import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
             import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
@@ -183,7 +177,7 @@
                 const lbBody = document.getElementById("leaderboard-body");
                 
                 try {
-                    // 1. Fetch Matches from Firebase (Safe open collection)
+                    // 1. Fetch Matches from Firebase
                     const matchesSnap = await getDocs(collection(db, "matches"));
                     let matches = [];
                     matchesSnap.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
@@ -191,36 +185,27 @@
                     const now = new Date().getTime();
                     const next48 = now + (48 * 60 * 60 * 1000);
 
-                    // Sort out match states
-                    const lockedMatchIds = matches
-                        .filter(m => m.status === 'FINISHED' || m.status === 'AWARDED' || (new Date(m.utcDate).getTime() - now) <= 3600000)
+                    const currentActiveMatchIds = matches
+                        .filter(m => m.status === 'FINISHED' || m.status === 'AWARDED' || new Date(m.utcDate).getTime() <= next48)
                         .map(m => m.id.toString());
 
                     let allPreds = [];
 
-                    // 2a. Fetch ONLY your own predictions (Complies with security rules)
-                    const myPredsQuery = query(collection(db, "predictions"), where("user_id", "==", currentUser.uid));
-                    const myPredsSnap = await getDocs(myPredsQuery);
-                    myPredsSnap.forEach(doc => allPreds.push(doc.data()));
-
-                    // 2b. Fetch everyone else's predictions ONLY for locked/finished matches
-                    if (lockedMatchIds.length > 0) {
+                    // 2. Safely grab all submitted document headers for active matches
+                    if (currentActiveMatchIds.length > 0) {
                         const batchSize = 30; 
-                        for (let i = 0; i < lockedMatchIds.length; i += batchSize) {
-                            const batchIds = lockedMatchIds.slice(i, i + batchSize);
-                            const lockedPredsQuery = query(collection(db, "predictions"), where("match_id", "in", batchIds));
-                            const lockedPredsSnap = await getDocs(lockedPredsQuery);
+                        for (let i = 0; i < currentActiveMatchIds.length; i += batchSize) {
+                            const batchIds = currentActiveMatchIds.slice(i, i + batchSize);
+                            const activePredsQuery = query(collection(db, "predictions"), where("match_id", "in", batchIds));
+                            const activePredsSnap = await getDocs(activePredsQuery);
                             
-                            lockedPredsSnap.forEach(doc => {
-                                const data = doc.data();
-                                if (data.user_id !== currentUser.uid) {
-                                    allPreds.push(data);
-                                }
+                            activePredsSnap.forEach(doc => {
+                                allPreds.push(doc.data());
                             });
                         }
                     }
 
-                    // 3. Fetch User Directory Baseline (Safe list for calculating names on leaderboard)
+                    // 3. Fetch User Directory Baseline for Leaderboard
                     const usersSnap = await getDocs(collection(db, "users"));
                     let userScoresMap = {};
                     usersSnap.forEach(doc => {
@@ -228,12 +213,11 @@
                         userScoresMap[doc.id] = { uid: doc.id, name: u.name, points: 0 };
                     });
                     
-                    // Fallback to ensure current user profile exists in baseline memory
                     if (!userScoresMap[currentUser.uid]) {
                         userScoresMap[currentUser.uid] = { uid: currentUser.uid, name: currentUser.displayName, points: 0 };
                     }
 
-                    // Calculate Points dynamically from historical data
+                    // Calculate Points from allowed historical data fields
                     allPreds.forEach(pred => {
                         if (!userScoresMap[pred.user_id]) {
                             userScoresMap[pred.user_id] = { uid: pred.user_id, name: pred.user_name || "Unknown Player", points: 0 };
@@ -241,7 +225,8 @@
 
                         const actualMatch = matches.find(m => m.id.toString() === pred.match_id.toString() && (m.status === 'FINISHED' || m.status === 'AWARDED'));
                         
-                        if (actualMatch && actualMatch.score && actualMatch.score.home !== null) {
+                        // Only calculate points if score fields were successfully pulled (historical match)
+                        if (actualMatch && actualMatch.score && actualMatch.score.home !== null && pred.home_pred !== undefined) {
                             const realHome = actualMatch.score.home;
                             const realAway = actualMatch.score.away;
                             const pHome = pred.home_pred;
@@ -265,7 +250,6 @@
 
                     let usersList = Object.values(userScoresMap).sort((a,b) => b.points - a.points);
 
-                    // Group layout arrays
                     const historyMatches = matches.filter(m => m.status === 'FINISHED' || m.status === 'AWARDED');
                     const upcomingMatches = matches.filter(m => 
                         m.status !== 'FINISHED' && m.status !== 'AWARDED' && 
@@ -311,26 +295,22 @@
 
                             html += `<div class="others-guesses"><strong>Everyone's Guesses:</strong><ul>`;
                             
-                            // Secure dynamic status check: Loop through all application players 
-                            // to confirm submission logs without needing access to hidden values.
                             Object.values(userScoresMap).forEach(player => {
                                 const isMe = player.uid === currentUser.uid;
                                 const safeName = escapeHTML(player.name);
                                 const nameDisplay = isMe ? `<b>${safeName} (You)</b>` : safeName;
                                 
-                                // Check if we have a prediction record in memory for this match
+                                // Look for a matching document token
                                 const loadedPred = allPreds.find(p => p.match_id === match.id && p.user_id === player.uid);
                                 
                                 let statusDisplay = "";
                                 if (isMe) {
                                     statusDisplay = myPred ? `<b>${myPred.home_pred} - ${myPred.away_pred}</b>` : `<span style="color:#888;">Not submitted yet</span>`;
                                 } else if (isLocked) {
-                                    // Match is locked, display score safely
                                     statusDisplay = loadedPred ? `<b>${loadedPred.home_pred} - ${loadedPred.away_pred}</b>` : `<span style="color:#888;">No prediction</span>`;
                                 } else {
-                                    // Match is open! We can infer if they submitted by checking if a record exists
-                                    // (Since your save function creates a user doc, we check status changes cleanly)
-                                    statusDisplay = loadedPred ? `<b style="color:green;">Submitted ⏳</b>` : `<i style="color:#aaa;">Hidden</i>`;
+                                    // Clean Submission Verification based on presence of database document token
+                                    statusDisplay = loadedPred ? `<b style="color:green;">Submitted ⏳</b>` : `<i style="color:#aaa;">Not submitted yet</i>`;
                                 }
                                 
                                 html += `<li>${nameDisplay}: ${statusDisplay}</li>`;
@@ -368,8 +348,8 @@
                                     </div>
                             `;
 
-                            const matchPreds = allPreds.filter(p => p.match_id === match.id);
-                            html += `<div class="others-guesses" style="background: white; border: 1px solid #ced4da;">rename<strong>Players' Guesses & Points:</strong><ul>`;
+                            const matchPreds = allPreds.filter(p => p.match_id === match.id && p.home_pred !== undefined);
+                            html += `<div class="others-guesses" style="background: white; border: 1px solid #ced4da;"><strong>Players' Guesses & Points:</strong><ul>`;
                             if(matchPreds.length === 0) {
                                 html += `<li><span style="color:#888;">No predictions were made.</span></li>`;
                             } else {
