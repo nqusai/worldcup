@@ -107,14 +107,15 @@
         </div>
 
         <footer style="text-align: center; font-size: 12px; color: #aaa; margin-top: 40px; padding-bottom: 20px;">
-            <span id="version-number">v06 (Sub-collection Patch)</span>
+            <span id="version-number">v05.2 (Fixed Status Sync)</span>
         </footer>
 
         <script type="module">
             import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
             import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
-            import { getFirestore, doc, setDoc, collection, getDocs, getDoc, query, where } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+            import { getFirestore, doc, setDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
+            // --- CONFIGURATION ---
             const firebaseConfig = {
                 apiKey: "AIzaSyC9KFqUVsnOjTEX3dqZpgzh85kFALdGRYk",
                 authDomain: "worldcup-210fb.firebaseapp.com",
@@ -124,6 +125,7 @@
                 appId: "1:393380182317:web:8db9333afe2fe04fd4bba4"
             };
             
+            // Initialize Firebase
             const app = initializeApp(firebaseConfig);
             const auth = getAuth(app);
             const db = getFirestore(app);
@@ -131,6 +133,7 @@
 
             let currentUser = null;
 
+            // --- XSS SANITIZER ---
             function escapeHTML(str) {
                 if (!str) return "";
                 return str.replace(/[&<>'"]/g, tag => ({
@@ -138,6 +141,7 @@
                 }[tag] || tag));
             }
 
+            // --- AUTHENTICATION ---
             document.getElementById("login-btn").addEventListener("click", () => signInWithPopup(auth, provider));
             document.getElementById("logout-btn").addEventListener("click", () => signOut(auth));
 
@@ -149,6 +153,7 @@
                     document.getElementById("logout-btn").style.display = "inline-block";
                     document.getElementById("predictions-section").style.display = "block";
                     document.getElementById("history-section").style.display = "block";
+                    
                     loadPlayerDashboard();
                 } else {
                     currentUser = null;
@@ -165,56 +170,24 @@
                 if (currentUser) loadPlayerDashboard();
             };
 
+            // --- MAIN DASHBOARD LOGIC ---
             async function loadPlayerDashboard() {
                 const container = document.getElementById("matches-container");
                 const historyContainer = document.getElementById("history-container");
                 const lbBody = document.getElementById("leaderboard-body");
                 
                 try {
+                    // 1. Fetch Matches
                     const matchesSnap = await getDocs(collection(db, "matches"));
                     let matches = [];
                     matchesSnap.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
                     
-                    const now = new Date().getTime();
-                    const next48 = now + (48 * 60 * 60 * 1000);
+                    // 2. Fetch Predictions 
+                    const predsSnap = await getDocs(collection(db, "predictions"));
+                    let allPreds = [];
+                    predsSnap.forEach(doc => allPreds.push(doc.data()));
 
-                    const currentActiveMatchIds = matches
-                        .filter(m => m.status === 'FINISHED' || m.status === 'AWARDED' || new Date(m.utcDate).getTime() <= next48)
-                        .map(m => m.id.toString());
-
-                    let allReceipts = [];
-                    let scoreVaultMap = {}; // Keyed by predId, holds {home_pred, away_pred}
-
-                    // 1. Download all public metadata receipts (Always readable)
-                    if (currentActiveMatchIds.length > 0) {
-                        const batchSize = 30; 
-                        for (let i = 0; i < currentActiveMatchIds.length; i += batchSize) {
-                            const batchIds = currentActiveMatchIds.slice(i, i + batchSize);
-                            const receiptsQuery = query(collection(db, "predictions"), where("match_id", "in", batchIds));
-                            const receiptsSnap = await getDocs(receiptsQuery);
-                            
-                            receiptsSnap.forEach(docSnap => {
-                                const rData = docSnap.data();
-                                const predId = docSnap.id;
-                                allReceipts.push({ predId: predId, ...rData });
-                            });
-                        }
-                    }
-
-                    // 2. Try to fetch the scores from the sub-collection vault for these receipts
-                    for (const receipt of allReceipts) {
-                        try {
-                            const scoreDoc = await getDoc(doc(db, "predictions", receipt.predId, "vault", "scores"));
-                            if (scoreDoc.exists()) {
-                                scoreVaultMap[receipt.predId] = scoreDoc.data();
-                            }
-                        } catch (e) {
-                            // Firestore securely blocked reading this specific user's scores early.
-                            // We explicitly pass, keeping scoreVaultMap[receipt.predId] undefined.
-                        }
-                    }
-
-                    // 3. Setup Leaderboard baseline
+                    // 3. Fetch Registered Leaderboard Users
                     const usersSnap = await getDocs(collection(db, "users"));
                     let userScoresMap = {};
                     usersSnap.forEach(doc => {
@@ -222,26 +195,24 @@
                         userScoresMap[doc.id] = { uid: doc.id, name: u.name, points: 0 };
                     });
                     
+                    // Ensure current user is mapped locally
                     if (!userScoresMap[currentUser.uid]) {
                         userScoresMap[currentUser.uid] = { uid: currentUser.uid, name: currentUser.displayName, points: 0 };
                     }
 
-                    // Compute points from unlocked data fields
-                    allReceipts.forEach(receipt => {
-                        const scores = scoreVaultMap[receipt.predId];
-                        if (!scores) return; // Can't calculate historical scores if still locked!
-
-                        if (!userScoresMap[receipt.user_id]) {
-                            userScoresMap[receipt.user_id] = { uid: receipt.user_id, name: receipt.user_name || "Unknown Player", points: 0 };
+                    // Dynamically calculate points from completed matches
+                    allPreds.forEach(pred => {
+                        if (!userScoresMap[pred.user_id]) {
+                            userScoresMap[pred.user_id] = { uid: pred.user_id, name: pred.user_name || "Unknown Player", points: 0 };
                         }
 
-                        const actualMatch = matches.find(m => m.id.toString() === receipt.match_id.toString() && (m.status === 'FINISHED' || m.status === 'AWARDED'));
+                        const actualMatch = matches.find(m => m.id.toString() === pred.match_id.toString() && (m.status === 'FINISHED' || m.status === 'AWARDED'));
                         
                         if (actualMatch && actualMatch.score && actualMatch.score.home !== null) {
                             const realHome = actualMatch.score.home;
                             const realAway = actualMatch.score.away;
-                            const pHome = scores.home_pred;
-                            const pAway = scores.away_pred;
+                            const pHome = pred.home_pred;
+                            const pAway = pred.away_pred;
 
                             let pts = 0;
                             if (pHome === realHome && pAway === realAway) {
@@ -252,12 +223,18 @@
                                 pts = 1; 
                             }
                             
-                            receipt.points_awarded = pts; 
-                            userScoresMap[receipt.user_id].points += pts;
+                            pred.points_awarded = pts; 
+                            userScoresMap[pred.user_id].points += pts;
+                        } else {
+                            pred.points_awarded = undefined;
                         }
                     });
 
                     let usersList = Object.values(userScoresMap).sort((a,b) => b.points - a.points);
+
+                    // Split matches into categories
+                    const now = new Date().getTime();
+                    const next48 = now + (48 * 60 * 60 * 1000);
 
                     const historyMatches = matches.filter(m => m.status === 'FINISHED' || m.status === 'AWARDED');
                     const upcomingMatches = matches.filter(m => 
@@ -277,12 +254,11 @@
                         upcomingMatches.forEach(match => {
                             const matchDate = new Date(match.utcDate);
                             const msUntilKickoff = matchDate.getTime() - now;
-                            const isLocked = msUntilKickoff <= 3600000;
+                            const isLocked = msUntilKickoff <= 3600000; // 1 Hour cutoff
                             
-                            const myReceipt = allReceipts.find(r => r.match_id === match.id && r.user_id === currentUser.uid);
-                            const myScores = myReceipt ? scoreVaultMap[myReceipt.predId] : null;
-                            const homeVal = myScores ? myScores.home_pred : "";
-                            const awayVal = myScores ? myScores.away_pred : "";
+                            const myPred = allPreds.find(p => p.match_id === match.id && p.user_id === currentUser.uid);
+                            const homeVal = myPred ? myPred.home_pred : "";
+                            const awayVal = myPred ? myPred.away_pred : "";
 
                             let html = `
                                 <div class="match">
@@ -296,7 +272,7 @@
                                             <span style="font-weight: bold;">-</span>
                                             <input type="number" id="away-${match.id}" value="${awayVal}" min="0" ${isLocked ? 'disabled' : ''}>
                                             <button id="btn-save-${match.id}" onclick="window.saveGuess('${match.id}')" ${isLocked ? 'disabled' : ''}>
-                                                ${isLocked ? 'Locked' : (myReceipt ? 'Update' : 'Save')}
+                                                ${isLocked ? 'Locked' : (myPred ? 'Update' : 'Save')}
                                             </button>
                                             <span id="status-${match.id}" style="font-size: 12px; width: 50px;"></span>
                                         </div>
@@ -305,22 +281,23 @@
 
                             html += `<div class="others-guesses"><strong>Everyone's Guesses:</strong><ul>`;
                             
+                            // Cycle through active directory users to build status badges cleanly
                             Object.values(userScoresMap).forEach(player => {
                                 const isMe = player.uid === currentUser.uid;
                                 const safeName = escapeHTML(player.name);
                                 const nameDisplay = isMe ? `<b>${safeName} (You)</b>` : safeName;
                                 
-                                const playerReceipt = allReceipts.find(r => r.match_id === match.id && r.user_id === player.uid);
-                                const playerScores = playerReceipt ? scoreVaultMap[playerReceipt.predId] : null;
+                                // Look up if an actual prediction document exists for this player/match combo
+                                const playerPred = allPreds.find(p => p.match_id === match.id && p.user_id === player.uid);
                                 
                                 let statusDisplay = "";
                                 if (isMe) {
-                                    statusDisplay = myScores ? `<b>${myScores.home_pred} - ${myScores.away_pred}</b>` : `<span style="color:#888;">Not submitted yet</span>`;
+                                    statusDisplay = myPred ? `<b>${myPred.home_pred} - ${myPred.away_pred}</b>` : `<span style="color:#888;">Not submitted yet</span>`;
                                 } else if (isLocked) {
-                                    statusDisplay = playerScores ? `<b>${playerScores.home_pred} - ${playerScores.away_pred}</b>` : `<span style="color:#888;">No prediction</span>`;
+                                    statusDisplay = playerPred ? `<b>${playerPred.home_pred} - ${playerPred.away_pred}</b>` : `<span style="color:#888;">No prediction</span>`;
                                 } else {
-                                    // Accurate Status tracking: Check if the metadata receipt token exists!
-                                    statusDisplay = playerReceipt ? `<b style="color:green;">Submitted ⏳</b>` : `<i style="color:#aaa;">Not submitted yet</i>`;
+                                    // FIXED: Status tracking checks if a prediction document actually exists for the user
+                                    statusDisplay = playerPred ? `<b style="color:green;">Submitted ⏳</b>` : `<i style="color:#aaa;">Not submitted yet</i>`;
                                 }
                                 
                                 html += `<li>${nameDisplay}: ${statusDisplay}</li>`;
@@ -358,26 +335,18 @@
                                     </div>
                             `;
 
-                            const matchReceipts = allReceipts.filter(r => r.match_id === match.id);
+                            const matchPreds = allPreds.filter(p => p.match_id === match.id);
                             html += `<div class="others-guesses" style="background: white; border: 1px solid #ced4da;"><strong>Players' Guesses & Points:</strong><ul>`;
-                            if(matchReceipts.length === 0) {
+                            if(matchPreds.length === 0) {
                                 html += `<li><span style="color:#888;">No predictions were made.</span></li>`;
                             } else {
-                                matchReceipts.forEach(r => {
-                                    const scores = scoreVaultMap[r.predId];
-                                    r.tempPoints = r.points_awarded || 0;
-                                });
-                                matchReceipts.sort((a,b) => b.tempPoints - a.tempPoints);
-                                
-                                matchReceipts.forEach(r => {
-                                    const scores = scoreVaultMap[r.predId];
-                                    const isMe = r.user_id === currentUser.uid;
-                                    const nameDisplay = isMe ? `<b>${r.user_name} (You)</b>` : r.user_name;
-                                    const pts = r.points_awarded || 0;
+                                matchPreds.sort((a,b) => (b.points_awarded || 0) - (a.points_awarded || 0));
+                                matchPreds.forEach(p => {
+                                    const isMe = p.user_id === currentUser.uid;
+                                    const nameDisplay = isMe ? `<b>${p.user_name} (You)</b>` : p.user_name;
+                                    const pts = p.points_awarded || 0;
                                     const pointString = pts > 0 ? ` <b style="color:green;">(+${pts} pts)</b>` : ` <span style="color:#888;">(+0 pts)</span>`;
-                                    
-                                    const finalScoreString = scores ? `<b>${scores.home_pred} - ${scores.away_pred}</b>` : `<i>Hidden</i>`;
-                                    html += `<li>${nameDisplay}: ${finalScoreString}${pointString}</li>`;
+                                    html += `<li>${nameDisplay}: <b>${p.home_pred} - ${p.away_pred}</b>${pointString}</li>`;
                                 });
                             }
                             html += `</ul></div></div>`;
@@ -385,6 +354,7 @@
                         });
                     }
 
+                    // Render Leaderboard layout
                     lbBody.innerHTML = "";
                     if(usersList.length === 0) {
                         lbBody.innerHTML = "<tr><td colspan='2' style='text-align: center;'>No players yet.</td></tr>";
@@ -417,15 +387,10 @@
                 
                 const predId = `${currentUser.uid}_${matchId}`;
                 try {
-                    // Save public receipt metadata
                     await setDoc(doc(db, "predictions", predId), {
                         user_id: currentUser.uid,
                         user_name: currentUser.displayName,
-                        match_id: matchId
-                    }, { merge: true });
-                    
-                    // Save actual secure predictions down in the private sub-collection vault
-                    await setDoc(doc(db, "predictions", predId, "vault", "scores"), {
+                        match_id: matchId,
                         home_pred: parseInt(h),
                         away_pred: parseInt(a)
                     }, { merge: true });
