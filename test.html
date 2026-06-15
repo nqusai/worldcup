@@ -113,7 +113,6 @@
         <script type="module">
             import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
             import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
-            import { getFirestore, doc, setDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
             import { getFirestore, doc, setDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
 
             // --- CONFIGURATION ---
@@ -167,19 +166,18 @@
                 }
             });
 
-            // Global wrapper for refresh button
             window.forceRefresh = function() {
                 if (currentUser) loadPlayerDashboard();
             };
 
-            // --- SECURE PLAYER FUNCTIONS ---
+            // --- SECURE DATA RETRIEVAL ---
             async function loadPlayerDashboard() {
                 const container = document.getElementById("matches-container");
                 const historyContainer = document.getElementById("history-container");
                 const lbBody = document.getElementById("leaderboard-body");
                 
                 try {
-                    // 1. Fetch Matches from Firebase
+                    // 1. Fetch Matches from Firebase (Safe open collection)
                     const matchesSnap = await getDocs(collection(db, "matches"));
                     let matches = [];
                     matchesSnap.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
@@ -187,21 +185,21 @@
                     const now = new Date().getTime();
                     const next48 = now + (48 * 60 * 60 * 1000);
 
-                    // Identify which match IDs are officially locked (kickoff <= 1 hour out or completely finished)
+                    // Sort out match states
                     const lockedMatchIds = matches
                         .filter(m => m.status === 'FINISHED' || m.status === 'AWARDED' || (new Date(m.utcDate).getTime() - now) <= 3600000)
                         .map(m => m.id.toString());
 
                     let allPreds = [];
 
-                    // 2a. Secure Query: Pull ONLY the current logged in user's predictions
+                    // 2a. Fetch ONLY your own predictions (Complies with security rules)
                     const myPredsQuery = query(collection(db, "predictions"), where("user_id", "==", currentUser.uid));
                     const myPredsSnap = await getDocs(myPredsQuery);
                     myPredsSnap.forEach(doc => allPreds.push(doc.data()));
 
-                    // 2b. Secure Query: Pull group predictions ONLY for matches that are locked
+                    // 2b. Fetch everyone else's predictions ONLY for locked/finished matches
                     if (lockedMatchIds.length > 0) {
-                        const batchSize = 30; // Firestore limit for 'in' queries
+                        const batchSize = 30; 
                         for (let i = 0; i < lockedMatchIds.length; i += batchSize) {
                             const batchIds = lockedMatchIds.slice(i, i + batchSize);
                             const lockedPredsQuery = query(collection(db, "predictions"), where("match_id", "in", batchIds));
@@ -209,7 +207,6 @@
                             
                             lockedPredsSnap.forEach(doc => {
                                 const data = doc.data();
-                                // Avoid re-adding your own records to the array
                                 if (data.user_id !== currentUser.uid) {
                                     allPreds.push(data);
                                 }
@@ -217,19 +214,17 @@
                         }
                     }
 
-                    // 3. Fetch Leaderboard baseline users
-                    const usersSnap = await getDocs(collection(db, "users"));
-                    let usersMap = {};
-                    usersSnap.forEach(doc => {
-                        const u = doc.data();
-                        usersMap[doc.id] = { name: u.name, points: 0 };
-                    });
+                    // 3. Dynamic Leaderboard Generation
+                    // Instead of downloading the whole user collection (which fires permission rules),
+                    // we dynamically create the leaderboard using the predictions we are permitted to read.
+                    let userScoresMap = {};
+                    
+                    // Seed yourself first
+                    userScoresMap[currentUser.uid] = { name: currentUser.displayName, points: 0 };
 
-                    // Calculate Points dynamically from data safely loaded into memory
                     allPreds.forEach(pred => {
-                        // Safe fallback if a user doc is missing
-                        if (!usersMap[pred.user_id]) {
-                            usersMap[pred.user_id] = { name: pred.user_name || "Unknown Player", points: 0 };
+                        if (!userScoresMap[pred.user_id]) {
+                            userScoresMap[pred.user_id] = { name: pred.user_name || "Unknown Player", points: 0 };
                         }
 
                         const actualMatch = matches.find(m => m.id.toString() === pred.match_id.toString() && (m.status === 'FINISHED' || m.status === 'AWARDED'));
@@ -250,16 +245,15 @@
                             }
                             
                             pred.points_awarded = pts; 
-                            usersMap[pred.user_id].points += pts;
+                            userScoresMap[pred.user_id].points += pts;
                         } else {
                             pred.points_awarded = undefined;
                         }
                     });
 
-                    // Convert map back to sorted array for display
-                    let sortedUsers = Object.values(usersMap).sort((a,b) => b.points - a.points);
+                    let usersList = Object.values(userScoresMap).sort((a,b) => b.points - a.points);
 
-                    // Split Matches into Upcoming and History layouts
+                    // Group layout arrays
                     const historyMatches = matches.filter(m => m.status === 'FINISHED' || m.status === 'AWARDED');
                     const upcomingMatches = matches.filter(m => 
                         m.status !== 'FINISHED' && m.status !== 'AWARDED' && 
@@ -278,7 +272,7 @@
                         upcomingMatches.forEach(match => {
                             const matchDate = new Date(match.utcDate);
                             const msUntilKickoff = matchDate.getTime() - now;
-                            const isLocked = msUntilKickoff <= 3600000; // 1 hour
+                            const isLocked = msUntilKickoff <= 3600000;
                             
                             const myPred = allPreds.find(p => p.match_id === match.id && p.user_id === currentUser.uid);
                             const homeVal = myPred ? myPred.home_pred : "";
@@ -313,12 +307,9 @@
                                     const safeName = escapeHTML(p.user_name);
                                     const nameDisplay = isMe ? `<b>${safeName} (You)</b>` : safeName;
                                     
-                                    let predDisplay = "";
-                                    if (isLocked || isMe) {
-                                        predDisplay = `<b>${p.home_pred} - ${p.away_pred}</b>`;
-                                    } else {
-                                        predDisplay = `<i style="color:#888;">Hidden until locked</i>`;
-                                    }
+                                    let predDisplay = isLocked || isMe 
+                                        ? `<b>${p.home_pred} - ${p.away_pred}</b>`
+                                        : `<i style="color:#888;">Hidden until locked</i>`;
                                     
                                     html += `<li>${nameDisplay}: ${predDisplay}</li>`;
                                 });
@@ -376,10 +367,10 @@
 
                     // Render Leaderboard layout
                     lbBody.innerHTML = "";
-                    if(sortedUsers.length === 0) {
+                    if(usersList.length === 0) {
                         lbBody.innerHTML = "<tr><td colspan='2' style='text-align: center;'>No players yet.</td></tr>";
                     } else {
-                        sortedUsers.forEach((u, index) => {
+                        usersList.forEach((u, index) => {
                             let medal = index === 0 ? "🥇 " : index === 1 ? "🥈 " : index === 2 ? "🥉 " : "";
                             lbBody.innerHTML += `
                                 <tr>
