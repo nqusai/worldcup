@@ -54,8 +54,8 @@
         <!-- Upcoming Matches Section -->
         <div class="card" id="predictions-section" style="display: none;">
             <h2 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
-                Matches (Next 24 Hours)
-                <button onclick="window.location.reload()" style="font-size: 12px; padding: 8px 15px;">Refresh</button>
+                Matches (Next 48 Hours)
+                <button onclick="window.forceRefresh()" style="font-size: 12px; padding: 8px 15px;">Refresh</button>
             </h2>
             <p style="font-size: 13px; color: #666;">Predictions lock exactly 1 hour before kickoff.</p>
             <div id="matches-container"></div>
@@ -111,7 +111,6 @@
             </details>
         </div>
 
-        
         <footer style="text-align: center; font-size: 12px; color: #aaa; margin-top: 40px; padding-bottom: 20px;">
             <span id="version-number">v05 (Final Version)</span>
         </footer>
@@ -232,21 +231,21 @@
 
                 // Time definitions
                     const now = new Date().getTime();
-                    const next24 = now + (24 * 60 * 60 * 1000);
+                    const next48 = now + (48 * 60 * 60 * 1000);
 
                     // Split Matches into Upcoming and History
                     const historyMatches = matches.filter(m => m.status === 'FINISHED' || m.status === 'AWARDED');
                     const upcomingMatches = matches.filter(m => 
                         m.status !== 'FINISHED' && m.status !== 'AWARDED' && 
-                        new Date(m.utcDate).getTime() <= next24
+                        new Date(m.utcDate).getTime() <= next48
                     );
 
                     // ==========================================
-                    // RENDER UPCOMING MATCHES (Next 24 Hours)
+                    // RENDER UPCOMING MATCHES (Next 48 Hours)
                     // ==========================================
                     container.innerHTML = "";
                     if(upcomingMatches.length === 0) {
-                        container.innerHTML = "<p>No matches scheduled in the next 24 hours.</p>";
+                        container.innerHTML = "<p>No matches scheduled in the next 48 hours.</p>";
                     } else {
                         upcomingMatches.sort((a,b) => new Date(a.utcDate) - new Date(b.utcDate));
                         
@@ -263,7 +262,6 @@
                                 <div class="match">
                                     <div class="match-header">
                                         <div class="match-info">
-                                            <span class="status-badge ${isLocked ? 'locked-badge' : ''}">${isLocked ? '🔒 LOCKED' : match.status}</span><br>
                                             <strong>${match.homeTeam}</strong> vs <strong>${match.awayTeam}</strong><br>
                                             <small style="color: #666;">${matchDate.toLocaleString()}</small>
                                         </div>
@@ -326,7 +324,6 @@
                                 <div class="match" style="background: #e9ecef; border-color: #ced4da;">
                                     <div class="match-header">
                                         <div class="match-info">
-                                            <span class="status-badge" style="background: #6c757d; color: white;">FINISHED</span><br>
                                             <strong>${match.homeTeam}</strong> vs <strong>${match.awayTeam}</strong><br>
                                             <small style="color: #666;">${matchDate.toLocaleString()}</small>
                                         </div>
