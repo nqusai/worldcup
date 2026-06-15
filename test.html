@@ -43,6 +43,7 @@
     <div id="app-root">
         <h1>🏆 iPredictor</h1>
 
+        <!-- Player Account Section -->
         <div class="card" id="auth-section">
             <h3 style="margin-top: 0;">Player Account</h3>
             <p id="user-info">Please log in to play.</p>
@@ -50,6 +51,7 @@
             <button id="logout-btn" style="display: none; background: #dc3545;">Log out</button>
         </div>
 
+        <!-- Upcoming Matches Section -->
         <div class="card" id="predictions-section" style="display: none;">
             <h2 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
                 Matches (Next 48 Hours)
@@ -59,6 +61,7 @@
             <div id="matches-container"></div>
         </div>
 
+        <!-- History Section -->
         <div class="card" id="history-section" style="display: none;">
             <details>
                 <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; outline: none; margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
@@ -69,6 +72,7 @@
             </details>
         </div>
 
+        <!-- Leaderboard Section -->
         <div class="card" id="leaderboard-section">
             <h2 style="margin-top: 0;">Live Leaderboard</h2>
             <table>
@@ -79,6 +83,7 @@
             </table>
         </div>
 
+        <!-- Game Rules Section -->
         <div class="card" id="rules-section">
             <details>
                 <summary style="font-size: 1.5em; font-weight: bold; cursor: pointer; outline: none; margin-top: 0; display: flex; align-items: center; justify-content: space-between;">
@@ -110,6 +115,7 @@
             <span id="version-number">v05 (Final Version)</span>
         </footer>
 
+        <!-- Application Logic -->
         <script type="module">
             import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
             import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
@@ -214,17 +220,23 @@
                         }
                     }
 
-                    // 3. Dynamic Leaderboard Generation
-                    // Instead of downloading the whole user collection (which fires permission rules),
-                    // we dynamically create the leaderboard using the predictions we are permitted to read.
+                    // 3. Fetch User Directory Baseline (Safe list for calculating names on leaderboard)
+                    const usersSnap = await getDocs(collection(db, "users"));
                     let userScoresMap = {};
+                    usersSnap.forEach(doc => {
+                        const u = doc.data();
+                        userScoresMap[doc.id] = { uid: doc.id, name: u.name, points: 0 };
+                    });
                     
-                    // Seed yourself first
-                    userScoresMap[currentUser.uid] = { name: currentUser.displayName, points: 0 };
+                    // Fallback to ensure current user profile exists in baseline memory
+                    if (!userScoresMap[currentUser.uid]) {
+                        userScoresMap[currentUser.uid] = { uid: currentUser.uid, name: currentUser.displayName, points: 0 };
+                    }
 
+                    // Calculate Points dynamically from historical data
                     allPreds.forEach(pred => {
                         if (!userScoresMap[pred.user_id]) {
-                            userScoresMap[pred.user_id] = { name: pred.user_name || "Unknown Player", points: 0 };
+                            userScoresMap[pred.user_id] = { uid: pred.user_id, name: pred.user_name || "Unknown Player", points: 0 };
                         }
 
                         const actualMatch = matches.find(m => m.id.toString() === pred.match_id.toString() && (m.status === 'FINISHED' || m.status === 'AWARDED'));
@@ -297,23 +309,33 @@
                                     </div>
                             `;
 
-                            const matchPreds = allPreds.filter(p => p.match_id === match.id);
                             html += `<div class="others-guesses"><strong>Everyone's Guesses:</strong><ul>`;
-                            if(matchPreds.length === 0) {
-                                html += `<li><span style="color:#888;">No predictions locked yet.</span></li>`;
-                            } else {
-                                matchPreds.forEach(p => {
-                                    const isMe = p.user_id === currentUser.uid;
-                                    const safeName = escapeHTML(p.user_name);
-                                    const nameDisplay = isMe ? `<b>${safeName} (You)</b>` : safeName;
-                                    
-                                    let predDisplay = isLocked || isMe 
-                                        ? `<b>${p.home_pred} - ${p.away_pred}</b>`
-                                        : `<i style="color:#888;">Hidden until locked</i>`;
-                                    
-                                    html += `<li>${nameDisplay}: ${predDisplay}</li>`;
-                                });
-                            }
+                            
+                            // Secure dynamic status check: Loop through all application players 
+                            // to confirm submission logs without needing access to hidden values.
+                            Object.values(userScoresMap).forEach(player => {
+                                const isMe = player.uid === currentUser.uid;
+                                const safeName = escapeHTML(player.name);
+                                const nameDisplay = isMe ? `<b>${safeName} (You)</b>` : safeName;
+                                
+                                // Check if we have a prediction record in memory for this match
+                                const loadedPred = allPreds.find(p => p.match_id === match.id && p.user_id === player.uid);
+                                
+                                let statusDisplay = "";
+                                if (isMe) {
+                                    statusDisplay = myPred ? `<b>${myPred.home_pred} - ${myPred.away_pred}</b>` : `<span style="color:#888;">Not submitted yet</span>`;
+                                } else if (isLocked) {
+                                    // Match is locked, display score safely
+                                    statusDisplay = loadedPred ? `<b>${loadedPred.home_pred} - ${loadedPred.away_pred}</b>` : `<span style="color:#888;">No prediction</span>`;
+                                } else {
+                                    // Match is open! We can infer if they submitted by checking if a record exists
+                                    // (Since your save function creates a user doc, we check status changes cleanly)
+                                    statusDisplay = loadedPred ? `<b style="color:green;">Submitted ⏳</b>` : `<i style="color:#aaa;">Waiting...</i>`;
+                                }
+                                
+                                html += `<li>${nameDisplay}: ${statusDisplay}</li>`;
+                            });
+                            
                             html += `</ul></div></div>`;
                             container.innerHTML += html;
                         });
@@ -347,7 +369,7 @@
                             `;
 
                             const matchPreds = allPreds.filter(p => p.match_id === match.id);
-                            html += `<div class="others-guesses" style="background: white; border: 1px solid #ced4da;"><strong>Players' Guesses & Points:</strong><ul>`;
+                            html += `<div class="others-guesses" style="background: white; border: 1px solid #ced4da;">rename<strong>Players' Guesses & Points:</strong><ul>`;
                             if(matchPreds.length === 0) {
                                 html += `<li><span style="color:#888;">No predictions were made.</span></li>`;
                             } else {
