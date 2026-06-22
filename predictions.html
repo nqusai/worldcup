@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iPredictor - Predictions</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f9; padding: 20px; max-width: 800px; margin: auto; color: #333; }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #888; font-size: 14px; margin-top: 0; margin-bottom: 25px; }
+        .card { background: white; padding: 20px; margin-bottom: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .match-title { font-size: 18px; font-weight: bold; color: #2c3e50; margin-bottom: 4px; }
+        .match-time { font-size: 13px; color: #888; margin-bottom: 12px; }
+        .predictions-list { list-style: none; padding: 0; margin: 0; }
+        .predictions-list li { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-radius: 6px; margin-bottom: 6px; background: #f8f9fa; border: 1px solid #e9ecef; font-size: 14px; }
+        .player-name { font-weight: 500; color: #333; }
+        .player-score { font-weight: bold; color: #007aff; font-size: 16px; }
+        .loading { text-align: center; color: #888; padding: 40px; font-size: 16px; }
+        footer { text-align: center; font-size: 12px; color: #aaa; margin-top: 40px; padding-bottom: 20px; }
+
+        /* Mobile Optimization */
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+            .match-title { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🏆 iPredictor</h1>
+    <p class="subtitle">Predictions for Upcoming Games</p>
+
+    <div id="predictions-container">
+        <p class="loading">Loading predictions...</p>
+    </div>
+
+    <footer>v01 (Predictions Page)</footer>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
+        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+
+        // --- FIREBASE CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyC9KFqUVsnOjTEX3dqZpgzh85kFALdGRYk",
+            authDomain: "worldcup-210fb.firebaseapp.com",
+            projectId: "worldcup-210fb",
+            storageBucket: "worldcup-210fb.firebasestorage.app",
+            messagingSenderId: "393380182317",
+            appId: "1:393380182317:web:8db9333afe2fe04fd4bba4"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        async function loadPredictions() {
+            const container = document.getElementById("predictions-container");
+
+            try {
+                // 1. Fetch all matches
+                const matchesSnap = await getDocs(collection(db, "matches"));
+                let matches = [];
+                matchesSnap.forEach(doc => matches.push({ id: doc.id, ...doc.data() }));
+
+                // 2. Fetch all predictions
+                const predsSnap = await getDocs(collection(db, "predictions"));
+                let allPreds = [];
+                predsSnap.forEach(doc => allPreds.push(doc.data()));
+
+                // 3. Filter to only future/upcoming matches
+                const now = new Date().getTime();
+                const upcomingMatches = matches
+                    .filter(m => m.status !== 'FINISHED' && m.status !== 'AWARDED' && new Date(m.utcDate).getTime() > now)
+                    .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
+
+                // 4. Only show matches that have at least one prediction
+                const matchesWithPredictions = upcomingMatches.filter(match => 
+                    allPreds.some(p => p.match_id === match.id)
+                );
+
+                // 5. Render
+                container.innerHTML = "";
+
+                if (matchesWithPredictions.length === 0) {
+                    container.innerHTML = `<p class="loading">No predictions submitted for upcoming games yet.</p>`;
+                    return;
+                }
+
+                matchesWithPredictions.forEach(match => {
+                    const matchDate = new Date(match.utcDate);
+                    const matchPreds = allPreds.filter(p => p.match_id === match.id);
+
+                    let predItemsHTML = "";
+                    matchPreds.forEach(p => {
+                        predItemsHTML += `
+                            <li>
+                                <span class="player-name">${p.user_name}</span>
+                                <span class="player-score">${p.home_pred} - ${p.away_pred}</span>
+                            </li>
+                        `;
+                    });
+
+                    container.innerHTML += `
+                        <div class="card">
+                            <div class="match-title">${match.homeTeam} vs ${match.awayTeam}</div>
+                            <div class="match-time">🕐 ${matchDate.toLocaleString()}</div>
+                            <ul class="predictions-list">
+                                ${predItemsHTML}
+                            </ul>
+                        </div>
+                    `;
+                });
+
+            } catch (err) {
+                container.innerHTML = `<p class="loading" style="color: red;">Error loading predictions: ${err.message}</p>`;
+            }
+        }
+
+        loadPredictions();
+    </script>
+
+</body>
+</html>
