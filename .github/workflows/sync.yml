@@ -1,9 +1,11 @@
 name: Auto-Sync World Cup Data
 
 on:
-  schedule:
-  - cron: '0,30 * * * *' 
-  workflow_dispatch: 
+  # Scheduled sync disabled — the 2026 World Cup is over.
+  # To re-enable, restore the schedule trigger below:
+  # schedule:
+  # - cron: '0,30 * * * *'
+  workflow_dispatch:
 
 jobs:
   update-firebase:
